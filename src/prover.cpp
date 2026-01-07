@@ -77,16 +77,16 @@ void prover::sumcheckDotProdInitPhase1() {
 
     for (u32 t = 0; t < fft_len; ++t)
         mult_array[1][t] = beta_gs[t];
-    for (u32 u = 0; u < total[1]; ++u) {
+    for (u64 u = 0; u < total[1]; ++u) {
         V_mult[0][u].clear();
         if (u >= cur.size_u[1]) V_mult[1][u].clear();
         else V_mult[1][u] = val[sumcheck_id - 1][u];
     }
 
     for (auto &gate: cur.bin_gates)
-        for (u32 t = 0; t < fft_len; ++t) {
-            u32 idx_u = gate.u << fft_bl | t;
-            u32 idx_v = gate.v << fft_bl | t;
+        for (u64 t = 0; t < (u64)fft_len; ++t) {
+            u64 idx_u = (u64)gate.u << fft_bl | t;
+            u64 idx_v = (u64)gate.v << fft_bl | t;
             V_mult[0][idx_u] = V_mult[0][idx_u] + beta_g[gate.g] * val[sumcheck_id - 1][idx_v];
         }
 
@@ -176,7 +176,7 @@ void prover::sumcheckInitPhase1(const F &relu_rou_0) {
     relu_rou = relu_rou_0;
     add_term.clear();
     for (int b = 0; b < 2; ++b)
-        for (u32 u = 0; u < total[b]; ++u)
+        for (u64 u = 0; u < total[b]; ++u)
             mult_array[b][u].clear();
 
     if (cur.ty == layerType::FFT || cur.ty == layerType::IFFT) {
@@ -187,24 +187,24 @@ void prover::sumcheckInitPhase1(const F &relu_rou_0) {
         if (cur.ty == layerType::FFT)
             initBetaTable(beta_g, cnt_bl, r_0 + fft_bl, r_1, alpha, beta);
         else initBetaTable(beta_g, cnt_bl, r_0 + fft_blh, alpha);
-        for (u32 u = 0, l = sumcheck_id - 1; u < total[1]; ++u) {
+        for (u64 u = 0, l = (u64)sumcheck_id - 1; u < total[1]; ++u) {
             V_mult[1][u].clear();
             if (u >= cur.size_u[1]) continue;
-            for (u32 g = 0; g < cnt_len; ++g) {
-                u32 idx = g << cur.max_bl_u | u;
+            for (u64 g = 0; g < (u64)cnt_len; ++g) {
+                u64 idx = g << cur.max_bl_u | u;
                 V_mult[1][u] = V_mult[1][u] + val[l][idx] * beta_g[g];
             }
         }
 
         beta_gs.resize(total[1]);
         phiGInit(beta_gs, r_0, cur.scale, fft_bl, cur.ty == layerType::IFFT);
-        for (u32 u = 0; u < total[1] ; ++u) {
+        for (u64 u = 0; u < total[1] ; ++u) {
             mult_array[1][u] = beta_gs[u];
         }
     } else {
         for (int b = 0; b < 2; ++b) {
             auto dep = !b ? 0 : sumcheck_id - 1;
-            for (u32 u = 0; u < total[b]; ++u) {
+            for (u64 u = 0; u < total[b]; ++u) {
                 if (u >= cur.size_u[b])
                     V_mult[b][u].clear();
                 else V_mult[b][u] = getCirValue(dep, cur.ori_id_u, u);
@@ -219,7 +219,7 @@ void prover::sumcheckInitPhase1(const F &relu_rou_0) {
                 beta_g[g] = beta_g[g >> fft_blh] * beta_gs[g & fft_lenh - 1];
         } else initBetaTable(beta_g, cur.bit_length, r_0, r_1, alpha * cur.scale, beta * cur.scale);
         if (cur.zero_start_id < cur.size)
-            for (u32 g = cur.zero_start_id; g < 1ULL << cur.bit_length; ++g) beta_g[g] = beta_g[g] * relu_rou;
+            for (u64 g = cur.zero_start_id; g < 1ULL << cur.bit_length; ++g) beta_g[g] = beta_g[g] * relu_rou;
 
         for (auto &gate: cur.uni_gates) {
             bool idx = gate.lu != 0;
@@ -265,20 +265,20 @@ void prover::sumcheckInitPhase2() {
 
     add_term.clear();
     for (int b = 0; b < 2; ++b) {
-        for (u32 v = 0; v < total[b]; ++v)
+        for (u64 v = 0; v < total[b]; ++v)
             mult_array[b][v].clear();
     }
 
     if (cur.ty == layerType::DOT_PROD) {
-        u32 fft_len = 1ULL << cur.fft_bit_length;
-        initBetaTable(beta_u, cnt_bl, r_u[sumcheck_id].begin() + fft_bl, F_ONE);
-        initBetaTable(beta_gs, fft_bl, r_u[sumcheck_id].begin(), F_ONE);
+        u64 fft_len = 1ULL << cur.fft_bit_length;
+        initBetaTable(beta_u, (u32)cnt_bl, r_u[sumcheck_id].begin() + fft_bl, F_ONE);
+        initBetaTable(beta_gs, (u32)fft_bl, r_u[sumcheck_id].begin(), F_ONE);
 
-        for (u32 v = 0; v < total[1]; ++v) {
+        for (u64 v = 0; v < total[1]; ++v) {
             V_mult[1][v].clear();
             if (v >= cur.size_v[1]) continue;
-            for (u32 t = 0; t < fft_len; ++t) {
-                u32 idx_v = (v << fft_bl) | t;
+            for (u64 t = 0; t < fft_len; ++t) {
+                u64 idx_v = (v << fft_bl) | t;
                 V_mult[1][v] = V_mult[1][v] + val[sumcheck_id - 1][idx_v] * beta_gs[t];
             }
         }
@@ -287,10 +287,10 @@ void prover::sumcheckInitPhase2() {
             mult_array[1][gate.v] =
                     mult_array[1][gate.v] + beta_g[gate.g] * beta_u[gate.u] * V_u1;
     } else {
-        initBetaTable(beta_u, cur.max_bl_u, r_u[sumcheck_id].begin(), F_ONE);
+        initBetaTable(beta_u, (u32)cur.max_bl_u, r_u[sumcheck_id].begin(), F_ONE);
         for (int b = 0; b < 2; ++b) {
-            auto dep = !b ? 0 : sumcheck_id - 1;
-            for (u32 v = 0; v < total[b]; ++v) {
+            auto dep = !b ? 0 : (u32)sumcheck_id - 1;
+            for (u64 v = 0; v < total[b]; ++v) {
                 V_mult[b][v] = v >= cur.size_v[b] ? F_ZERO : getCirValue(dep, cur.ori_id_v, v);
             }
         }
@@ -326,18 +326,18 @@ void prover::sumcheckLiuInit(const vector<F> &s_u, const vector<F> &s_v) {
     prove_timer.start();
     add_term.clear();
 
-    for (u32 g = 0; g < total[1]; ++g) {
+    for (u64 g = 0; g < total[1]; ++g) {
         mult_array[1][g].clear();
         V_mult[1][g] = (g < total_size[1]) ? val[0][g] : F_ZERO;
     }
 
-    for (u8 i = sumcheck_id + 1; i < C.size; ++i) {
+    for (u32 i = sumcheck_id + 1; i < C.size; ++i) {
         i8 bit_length_i = C.circuit[i].bit_length_u[0];
-        u32 size_i = C.circuit[i].size_u[0];
+        u64 size_i = C.circuit[i].size_u[0];
         if (~bit_length_i) {
-            initBetaTable(beta_g, bit_length_i, r_u[i].begin(), s_u[i - 1]);
-            for (u32 hu = 0; hu < size_i; ++hu) {
-                u32 u = C.circuit[i].ori_id_u[hu];
+            initBetaTable(beta_g, (u32)bit_length_i, r_u[i].begin(), s_u[i - 1]);
+            for (u64 hu = 0; hu < size_i; ++hu) {
+                u64 u = C.circuit[i].ori_id_u[hu];
                 mult_array[1][u] = mult_array[1][u] + beta_g[hu];
             }
         }
@@ -345,9 +345,9 @@ void prover::sumcheckLiuInit(const vector<F> &s_u, const vector<F> &s_v) {
         bit_length_i = C.circuit[i].bit_length_v[0];
         size_i = C.circuit[i].size_v[0];
         if (~bit_length_i) {
-            initBetaTable(beta_g, bit_length_i, r_v[i].begin(), s_v[i - 1]);
-            for (u32 hv = 0; hv < size_i; ++hv) {
-                u32 v = C.circuit[i].ori_id_v[hv];
+            initBetaTable(beta_g, (u32)bit_length_i, r_v[i].begin(), s_v[i - 1]);
+            for (u64 hv = 0; hv < size_i; ++hv) {
+                u64 v = C.circuit[i].ori_id_v[hv];
                 mult_array[1][v] = mult_array[1][v] + beta_g[hv];
             }
         }
@@ -404,8 +404,8 @@ quadratic_poly prover::sumcheckUpdateEach(const F &previous_random, bool idx) {
     }
 
     quadratic_poly ret;
-    for (u32 i = 0; i < (total[idx] >> 1); ++i) {
-        u32 g0 = i << 1, g1 = i << 1 | 1;
+    for (u64 i = 0; i < (total[idx] >> 1); ++i) {
+        u64 g0 = i << 1, g1 = i << 1 | 1;
         if (g0 >= total_size[idx]) {
             tmp_v[i].clear();
             tmp_mult[i].clear();
@@ -431,15 +431,15 @@ quadratic_poly prover::sumcheckUpdateEach(const F &previous_random, bool idx) {
  * @param the value of the array & random point & the size of the array & the size of the random point
  * @return sum of `values`, or 0.0 if `values` is empty.
  */
-F prover::Vres(const vector<F>::const_iterator &r, u32 output_size, u8 r_size) {
+F prover::Vres(const vector<F>::const_iterator &r, u64 output_size, u32 r_size) {
     prove_timer.start();
 
     vector<F> output(output_size);
-    for (u32 i = 0; i < output_size; ++i)
+    for (u64 i = 0; i < output_size; ++i)
         output[i] = val[C.size - 1][i];
-    u32 whole = 1ULL << r_size;
-    for (u8 i = 0; i < r_size; ++i) {
-        for (u32 j = 0; j < (whole >> 1); ++j) {
+    u64 whole = 1ULL << r_size;
+    for (u32 i = 0; i < r_size; ++i) {
+        for (u64 j = 0; j < (whole >> 1); ++j) {
             if (j > 0)
                 output[j].clear();
             if ((j << 1) < output_size)
@@ -496,7 +496,7 @@ void prover::sumcheckLiuFinalize(const F &previous_random, F &claim_1) {
     beta_g.clear();
 }
 
-F prover::getCirValue(u8 layer_id, const vector<u32> &ori, u32 u) {
+F prover::getCirValue(u32 layer_id, const vector<u64> &ori, u64 u) {
     return !layer_id ? val[0][ori[u]] : val[layer_id][u];
 }
 

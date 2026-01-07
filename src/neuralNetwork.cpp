@@ -98,7 +98,7 @@ void neuralNetwork::create(prover &pr, bool only_compute) {
             // update the scale bit
             x_next_bit = getNextBit(layer_id - 1);
             T = x_bit + w_bit - x_next_bit;
-            Q_MAX = Q + T;
+            Q_MAX = 60;  // Increased to 60 to prevent int64 overflow during Witness generation
             if (pool_ty != MAX)
                 reluActConvLayer(pr.C.circuit[layer_id], layer_id);
         }
@@ -123,7 +123,7 @@ void neuralNetwork::create(prover &pr, bool only_compute) {
         // update the scale bit
         x_next_bit = getNextBit(layer_id - 1);
         T = x_bit + w_bit - x_next_bit;
-        Q_MAX = Q + T;
+        Q_MAX = 60;  // Increased to 60 to prevent int64 overflow during Witness generation
         reluActFconLayer(pr.C.circuit[layer_id], layer_id);
     }
 
@@ -359,9 +359,16 @@ void neuralNetwork::reluActConvLayer(layer &circuit, i64 &layer_id) {
     for (i64 g = 0; g < block_len; ++g) {
         i64 sign_u = first_dcmp_id + g * Q_MAX;
         for (i64 s = 1; s < Q; ++s) {
-            i64 v = sign_u + s;
-            circuit.uni_gates.emplace_back(g, v, 0, Q - 1 - s);
-            circuit.bin_gates.emplace_back(g, sign_u, v, Q - s + Q_BIT_SIZE, 0);
+            // Truncation logic: X_out = (X_in >> T)
+            // Bit j of X_out is bit (j+T) of X_in
+            // j = Q - 1 - s
+            // bit_idx = Q_MAX - 1 - (j + T) = Q_MAX - 1 - (Q - 1 - s + T) = Q_MAX - Q + s - T
+            i64 v_idx = Q_MAX - Q + s - T;
+            if (v_idx >= 1 && v_idx < Q_MAX) {
+                i64 v = sign_u + v_idx;
+                circuit.uni_gates.emplace_back(g, v, 0, Q - 1 - s);
+                circuit.bin_gates.emplace_back(g, sign_u, v, Q - s + Q_BIT_SIZE, 0);
+            }
         }
     }
 
@@ -773,10 +780,10 @@ void neuralNetwork::printLayerInfo(const layer &circuit, i64 layer_id) {
 }
 
 void neuralNetwork::printWitnessInfo(const layer &circuit) const {
-    assert(circuit.size == total_in_size);
-    u32 total_data_in_size = total_in_size - total_relu_in_size - total_ave_in_size - total_max_in_size;
-    fprintf(stderr,"%u (2^%2d) = %u (%.2f%% data) + %lld (%.2f%% relu) + %lld (%.2f%% ave) + %lld (%.2f%% max), ",
-            circuit.size, circuit.bit_length, total_data_in_size, 100.0 * total_data_in_size / (double) total_in_size,
+    assert(circuit.size == (u64)total_in_size);
+    u64 total_data_in_size = total_in_size - total_relu_in_size - total_ave_in_size - total_max_in_size;
+    fprintf(stderr,"%llu (2^%2d) = %llu (%.2f%% data) + %lld (%.2f%% relu) + %lld (%.2f%% ave) + %lld (%.2f%% max), ",
+            (unsigned long long)circuit.size, (int)circuit.bit_length, (unsigned long long)total_data_in_size, 100.0 * total_data_in_size / (double) total_in_size,
             total_relu_in_size, 100.0 * total_relu_in_size / (double) total_in_size,
             total_ave_in_size, 100.0 * total_ave_in_size / (double) total_in_size,
             total_max_in_size, 100.0 * total_max_in_size / (double) total_in_size);
@@ -789,6 +796,7 @@ i64 neuralNetwork::getPoolDecmpSize() const {
         case MAX: return new_nx_in * new_ny_in * sqr(pool_sz) * channel_out * pic_parallel * (Q_MAX - 1);
         default:
             assert(false);
+            return 0;
     }
 }
 
@@ -897,13 +905,22 @@ void neuralNetwork::readFconWeight(i64 first_fc_id) {
 }
 
 void neuralNetwork::prepareDecmpBit(i64 layer_id, i64 idx, i64 dcmp_id, i64 bit_shift) {
-    auto data = abs(val[layer_id].at(idx).getInt64());
-    val[0].at(dcmp_id) = (data >> bit_shift) & 1;
+    auto f = val[layer_id].at(idx);
+    if (f.isNegative()) f = -f;
+    string s = f.getStr(2);
+    // getStr(2) returns bits from MSB to LSB
+    int len = s.length();
+    int pos = len - 1 - bit_shift;
+    val[0].at(dcmp_id) = (pos >= 0 && s[pos] == '1') ? F_ONE : F_ZERO;
 }
 
 void neuralNetwork::prepareFieldBit(const F &data, i64 dcmp_id, i64 bit_shift) {
-    auto tmp = abs(data.getInt64());
-    val[0].at(dcmp_id) = (tmp >> bit_shift) & 1;
+    auto f = data;
+    if (f.isNegative()) f = -f;
+    string s = f.getStr(2);
+    int len = s.length();
+    int pos = len - 1 - bit_shift;
+    val[0].at(dcmp_id) = (pos >= 0 && s[pos] == '1') ? F_ONE : F_ZERO;
 }
 
 void neuralNetwork::prepareSignBit(i64 layer_id, i64 idx, i64 dcmp_id) {
@@ -925,7 +942,7 @@ void neuralNetwork::calcNormalLayer(const layer &circuit, i64 layer_id) {
 
 
     for (auto &gate: circuit.bin_gates) {
-        u8 bin_lu = gate.getLayerIdU(layer_id), bin_lv = gate.getLayerIdV(layer_id);
+        u32 bin_lu = gate.getLayerIdU(layer_id), bin_lv = gate.getLayerIdV(layer_id);
         val[layer_id].at(gate.g) = val[layer_id].at(gate.g) + val[bin_lu].at(gate.u) * val[bin_lv][gate.v] * two_mul[gate.sc];
     }
 
@@ -940,7 +957,7 @@ void neuralNetwork::calcDotProdLayer(const layer &circuit, i64 layer_id) {
 
     char fft_bit = circuit.fft_bit_length;
     u32 fft_len = 1 << fft_bit;
-    u8 l = layer_id - 1;
+    u32 l = layer_id - 1;
     for (auto &gate: circuit.bin_gates)
         for (int s = 0; s < fft_len; ++s)
             val[layer_id][gate.g << fft_bit | s] = val[layer_id][gate.g << fft_bit | s] +
@@ -970,9 +987,10 @@ int neuralNetwork::getNextBit(int layer_id) {
         if (!x.isNegative()) mx = max(mx, x);
         else mn = max(mn, -x);
     }
-    i64 x = (mx + mn).getInt64();
-    double real_scale = x / exp2(x_bit + w_bit);
-    int res = (int) log2( ((1 << (Q - 1)) - 1) / real_scale );
+    F total = mx + mn;
+    string s = total.getStr(2);
+    int log2_x = s.length();
+    int res = (Q - 1) + (x_bit + w_bit) - log2_x;
     return res;
 }
 
@@ -980,7 +998,7 @@ void neuralNetwork::printLayerValues(prover &pr) {
     for (i64 i = 0; i < SIZE; ++i) {
 //        if (pr.C.circuit[i].ty == layerType::FCONN || pr.C.circuit[i].ty == layerType::ADD_BIAS || i && i < SIZE - 1 && pr.C.circuit[i + 1].ty == layerType::PADDING) {
         cerr << i << "(" << pr.C.circuit[i].zero_start_id << ", " << pr.C.circuit[i].size << "):\t";
-        for (i64 j = 0; j < std::min(200u, pr.C.circuit[i].size); ++j)
+        for (i64 j = 0; j < (i64)std::min((u64)200, pr.C.circuit[i].size); ++j)
             if (!pr.val[i][j].isZero()) cerr << pr.val[i][j] << ' ';
         cerr << endl;
         for (i64 j = pr.C.circuit[i].zero_start_id; j < pr.C.circuit[i].size; ++j)

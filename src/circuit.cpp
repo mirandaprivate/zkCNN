@@ -8,7 +8,7 @@ void layeredCircuit::initSubset() {
     vector<int> visited_vidx(circuit[0].size);  // whether the i-th layer, j-th gate has been visited in the current layer
     vector<u64> subset_vidx(circuit[0].size);   // the subset index of the i-th layer, j-th gate
 
-    for (u8 i = 1; i < size; ++i) {
+    for (u32 i = 1; i < size; ++i) {
         auto &cur = circuit[i], &lst = circuit[i - 1];
         bool has_pre_layer_u = circuit[i].ty == layerType::FFT || circuit[i].ty == layerType::IFFT;
         bool has_pre_layer_v = false;
@@ -87,7 +87,7 @@ void layeredCircuit::initSubset() {
     cerr << "begin subset finish." << endl;
 }
 
-void layeredCircuit::init(u8 q_bit_size, u8 _layer_sz) {
+void layeredCircuit::init(u8 q_bit_size, u32 _layer_sz) {
     two_mul.resize((q_bit_size + 1) << 1);
     two_mul[0] = F_ONE;
     two_mul[q_bit_size + 1] = -F_ONE;

@@ -20,13 +20,13 @@ int floorPow2BitLengthSigned(double n) {
     return (i8) floor(log2(n));
 }
 
-i8 ceilPow2BitLength(u32 n) {
-    return n < 1e-9 ? -1 : (i8) ceil(log(n) / log(2.));
+i8 ceilPow2BitLength(u64 n) {
+    return n == 0 ? -1 : (i8) ceil(log((double)n) / log(2.));
 }
 
-i8 floorPow2BitLength(u32 n) {
+i8 floorPow2BitLength(u64 n) {
 //    cerr << n << ' ' << log(n) / log(2.)<<endl;
-    return n < 1e-9 ? -1 : (i8) floor(log(n) / log(2.));
+    return n == 0 ? -1 : (i8) floor(log((double)n) / log(2.));
 }
 
 void initHalfTable(vector<F> &beta_f, vector<F> &beta_s, const vector<F>::const_iterator &r, const F &init, u32 first_half, u32 second_half) {
@@ -34,7 +34,7 @@ void initHalfTable(vector<F> &beta_f, vector<F> &beta_s, const vector<F>::const_
     beta_s.at(0) = F_ONE;
 
     for (u32 i = 0; i < first_half; ++i) {
-        for (u32 j = 0; j < (1ULL << i); ++j) {
+        for (u64 j = 0; j < (1ULL << i); ++j) {
             auto tmp = beta_f.at(j) * r[i];
             beta_f.at(j | (1ULL << i)) = tmp;
             beta_f.at(j) = beta_f[j] - tmp;
@@ -42,7 +42,7 @@ void initHalfTable(vector<F> &beta_f, vector<F> &beta_s, const vector<F>::const_
     }
 
     for (u32 i = 0; i < second_half; ++i) {
-        for (u32 j = 0; j < (1ULL << i); ++j) {
+        for (u64 j = 0; j < (1ULL << i); ++j) {
             auto tmp = beta_s[j] * r[(i + first_half)];
             beta_s[j | (1ULL << i)] = tmp;
             beta_s[j] = beta_s[j] - tmp;
@@ -51,11 +51,11 @@ void initHalfTable(vector<F> &beta_f, vector<F> &beta_s, const vector<F>::const_
 }
 
 void phiPowInit(vector<F> &phi_mul, int n, bool isIFFT) {
-    u32 N = 1ULL << n;
+    u64 N = 1ULL << n;
     F phi = getRootOfUnit(n);
     if (isIFFT) F::inv(phi, phi);
     phi_mul[0] = F_ONE;
-    for (u32 i = 1; i < N; ++i) phi_mul[i] = phi_mul[i - 1] * phi;
+    for (u64 i = 1; i < N; ++i) phi_mul[i] = phi_mul[i - 1] * phi;
 }
 
 void phiGInit(vector<F> &phi_g, const vector<F>::const_iterator &rx, const F &scale, int n, bool isIFFT) {
@@ -145,37 +145,37 @@ void fft(vector<F> &arr, int logn, bool flag) {
 }
 
 void
-initBetaTable(vector<F> &beta_g, u8 gLength, const vector<F>::const_iterator &r_0, const vector<F>::const_iterator &r_1,
+initBetaTable(vector<F> &beta_g, u32 gLength, const vector<F>::const_iterator &r_0, const vector<F>::const_iterator &r_1,
               const F &alpha, const F &beta) {
-    u8 first_half = gLength >> 1, second_half = gLength - first_half;
-    u32 mask_fhalf = (1ULL << first_half) - 1;
+    u32 first_half = gLength >> 1, second_half = gLength - first_half;
+    u64 mask_fhalf = (1ULL << first_half) - 1;
 
     vector<F> beta_f(1ULL << first_half), beta_s(1ULL << second_half);
     if (!beta.isZero()) {
         initHalfTable(beta_f, beta_s, r_1, beta, first_half, second_half);
-        for (u32 i = 0; i < (1ULL << gLength); ++i)
+        for (u64 i = 0; i < (1ULL << gLength); ++i)
             beta_g[i] = beta_f[i & mask_fhalf] * beta_s[i >> first_half];
-    } else for (u32 i = 0; i < (1ULL << gLength); ++i)
+    } else for (u64 i = 0; i < (1ULL << gLength); ++i)
         beta_g[i].clear();
 
     if (alpha.isZero()) return;
     initHalfTable(beta_f, beta_s, r_0, alpha, first_half, second_half);
-    for (u32 i = 0; i < (1ULL << gLength); ++i)
+    for (u64 i = 0; i < (1ULL << gLength); ++i)
         beta_g[i] = beta_g[i] + beta_f[i & mask_fhalf] * beta_s[i >> first_half];
 }
 
 
-void initBetaTable(vector<F> &beta_g, u8 gLength, const vector<F>::const_iterator &r, const F &init) {
-    if (gLength == -1) return;
-    int first_half = gLength >> 1, second_half = gLength - first_half;
-    u32 mask_fhalf = (1ULL << first_half) - 1;
+void initBetaTable(vector<F> &beta_g, u32 gLength, const vector<F>::const_iterator &r, const F &init) {
+    if (gLength == (u32)-1) return;
+    u32 first_half = gLength >> 1, second_half = gLength - first_half;
+    u64 mask_fhalf = (1ULL << first_half) - 1;
     vector<F> beta_f(1ULL << first_half), beta_s(1ULL << second_half);
 
     if (!init.isZero()) {
         initHalfTable(beta_f, beta_s, r, init, first_half, second_half);
-        for (u32 i = 0; i < (1ULL << gLength); ++i)
+        for (u64 i = 0; i < (1ULL << gLength); ++i)
             beta_g[i] = beta_f[i & mask_fhalf] * beta_s[i >> first_half];
-    } else for (u32 i = 0; i < (1ULL << gLength); ++i)
+    } else for (u64 i = 0; i < (1ULL << gLength); ++i)
         beta_g[i].clear();
 }
 

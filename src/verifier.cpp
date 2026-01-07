@@ -33,7 +33,7 @@ F verifier::getFinalValue(const F &claim_u0, const F &claim_u1, const F &claim_v
     return test_value;
 }
 
-void verifier::betaInitPhase1(u8 depth, const F &alpha, const F &beta, const vector<F>::const_iterator &r_0, const vector<F>::const_iterator &r_1, const F &relu_rou) {
+void verifier::betaInitPhase1(u32 depth, const F &alpha, const F &beta, const vector<F>::const_iterator &r_0, const vector<F>::const_iterator &r_1, const F &relu_rou) {
     i8 bl = C.circuit[depth].bit_length;
     i8 fft_bl = C.circuit[depth].fft_bit_length;
     i8 fft_blh = C.circuit[depth].fft_bit_length - 1;
@@ -64,8 +64,8 @@ void verifier::betaInitPhase1(u8 depth, const F &alpha, const F &beta, const vec
 
             beta_u.resize(1ULL << cnt_bl2);
             initBetaTable(beta_u, cnt_bl2, r_u[depth].begin() + fft_bl, F_ONE);
-            for (u32 i = 0; i < 1ULL << cnt_bl2; ++i)
-                for (u32 j = 0; j < fft_bl; ++j)
+            for (u64 i = 0; i < 1ULL << cnt_bl2; ++i)
+                for (u64 j = 0; j < (u64)fft_bl; ++j)
                     beta_u[i] = beta_u[i] * ((r_0[j] * r_u[depth][j]) + (F_ONE - r_0[j]) * (F_ONE - r_u[depth][j]));
             break;
 
@@ -74,25 +74,25 @@ void verifier::betaInitPhase1(u8 depth, const F &alpha, const F &beta, const vec
             initBetaTable(beta_g, C.circuit[depth].bit_length, r_0, r_1, alpha * C.circuit[depth].scale,
                           beta * C.circuit[depth].scale);
             if (C.circuit[depth].zero_start_id < C.circuit[depth].size)
-                for (u32 g = C.circuit[depth].zero_start_id; g < 1ULL << C.circuit[depth].bit_length; ++g)
+                for (u64 g = C.circuit[depth].zero_start_id; g < 1ULL << C.circuit[depth].bit_length; ++g)
                     beta_g[g] = beta_g[g] * relu_rou;
             beta_u.resize(1ULL << C.circuit[depth].max_bl_u);
             initBetaTable(beta_u, C.circuit[depth].max_bl_u, r_u[depth].begin(), F_ONE);
     }
 }
 
-void verifier::betaInitPhase2(u8 depth) {
+void verifier::betaInitPhase2(u32 depth) {
     beta_v.resize(1ULL << C.circuit[depth].max_bl_v);
     initBetaTable(beta_v, C.circuit[depth].max_bl_v, r_v[depth].begin(), F_ONE);
 }
 
-void verifier::predicatePhase1(u8 layer_id) {
+void verifier::predicatePhase1(u32 layer_id) {
     auto &cur_layer = C.circuit[layer_id];
 
     uni_value[0].clear();
     uni_value[1].clear();
     if (cur_layer.ty == layerType::FFT || cur_layer.ty == layerType::IFFT)
-        for (u32 u = 0; u < 1ULL << cur_layer.max_bl_u; ++u)
+        for (u64 u = 0; u < 1ULL << cur_layer.max_bl_u; ++u)
             uni_value[1] = uni_value[1] + beta_gs[u] * beta_u[u];
     else for (auto &gate: cur_layer.uni_gates) {
             bool idx = gate.lu;
@@ -101,7 +101,7 @@ void verifier::predicatePhase1(u8 layer_id) {
     bin_value[0] = bin_value[1] = bin_value[2] = F_ZERO;
 }
 
-void verifier::predicatePhase2(u8 layer_id) {
+void verifier::predicatePhase2(u32 layer_id) {
     uni_value[0] = uni_value[0] * beta_v[0];
     uni_value[1] = uni_value[1] * beta_v[0];
 
@@ -116,7 +116,7 @@ void verifier::predicatePhase2(u8 layer_id) {
 }
 
 bool verifier::verify() {
-    u8 logn = C.circuit[0].bit_length;
+    u32 logn = C.circuit[0].bit_length;
     u64 n_sqrt = 1ULL << (logn - (logn >> 1));
     vector<G> gens(n_sqrt);
     for (auto &x: gens) {
@@ -163,7 +163,7 @@ bool verifier::verifyInnerLayers() {
     auto previousSum = p->Vres(r_0, C.circuit[C.size - 1].size, C.circuit[C.size - 1].bit_length);
     p -> sumcheckInitAll(r_0);
 
-    for (u8 i = C.size - 1; i; --i) {
+    for (u32 i = C.size - 1; i; --i) {
         auto &cur = C.circuit[i];
         p->sumcheckInit(alpha, beta);
         total_timer.start();

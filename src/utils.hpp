@@ -10,21 +10,21 @@
 int ceilPow2BitLengthSigned(double n);
 int floorPow2BitLengthSigned(double n);
 
-char ceilPow2BitLength(u32 n);
-char floorPow2BitLength(u32 n);
+char ceilPow2BitLength(u64 n);
+char floorPow2BitLength(u64 n);
 
 
 void fft(vector<F> &arr, int logn, bool flag);
 
 void
-initBetaTable(vector<F> &beta_g, u8 gLength, const vector<F>::const_iterator &r_0, const vector<F>::const_iterator &r_1,
+initBetaTable(vector<F> &beta_g, u32 gLength, const vector<F>::const_iterator &r_0, const vector<F>::const_iterator &r_1,
               const F &alpha, const F &beta);
 
 void initPhiTable(F *phi_g, const layer &cur_layer, const F *r_0, const F *r_1, F alpha, F beta);
 
 void phiGInit(vector<F> &phi_g, const vector<F>::const_iterator &rx, const F &scale, int n, bool isIFFT);
 
-void initBetaTable(vector<F> &beta_g, u8 gLength, const vector<F>::const_iterator &r, const F &init);
+void initBetaTable(vector<F> &beta_g, u32 gLength, const vector<F>::const_iterator &r, const F &init);
 
 bool check(long x, long y, long nx, long ny);
 

@@ -27,7 +27,7 @@ public:
     quadratic_poly sumcheckUpdate1(const F &previous_random);
     quadratic_poly sumcheckUpdate2(const F &previous_random);
 
-    F Vres(const vector<F>::const_iterator &r, u32 output_size, u8 r_size);
+    F Vres(const vector<F>::const_iterator &r, u64 output_size, u32 r_size);
 
     void sumcheckDotProdFinalize1(const F &previous_random, F &claim_1);
     void sumcheckFinalize1(const F &previous_random, F &claim_0, F &claim_1);
@@ -50,7 +50,7 @@ public:
 private:
     quadratic_poly sumcheckUpdateEach(const F &previous_random, bool idx);
     quadratic_poly sumcheckUpdate(const F &previous_random, vector<F> &r_arr);
-    F getCirValue(u8 layer_id, const vector<u32> &ori, u32 u);
+    F getCirValue(u32 layer_id, const vector<u64> &ori, u64 u);
 
     vector<F>::iterator r_0, r_1;         // current positions
     vector<vector<F>> r_u, r_v;             // next positions
@@ -67,9 +67,9 @@ private:
 
     u64 proof_size;
 
-    u32 total[2], total_size[2];
-    u8 round;          // step within a sumcheck
-    u8 sumcheck_id;    // the level
+    u64 total[2], total_size[2];
+    u32 round;          // step within a sumcheck
+    u32 sumcheck_id;    // the level
 
     unique_ptr<hyrax_bls12_381::polyProver> poly_p;
 
