@@ -126,13 +126,30 @@ bool verifier::verify() {
     }
 
     poly_v = std::make_unique<hyrax_bls12_381::polyVerifier>(p -> commitInput(gens), gens);
-    return verifyInnerLayers() && verifyFirstLayer() && verifyInput();
+    
+    bool all_pass = true;
+    all_pass = verifyInnerLayers() && all_pass;
+    all_pass = verifyFirstLayer() && all_pass;
+    all_pass = verifyInput() && all_pass;
+
+    if (all_pass) {
+        fprintf(stderr, "Final Verification pass\n");
+    } else {
+        fprintf(stderr, "Final Verification fail\n");
+    }
+
+    fprintf(stderr, "Total Prove Time (GKR + Poly): %lf\n", p->proveTime() + p->polyProverTime());
+    fprintf(stderr, "Total Verify Time: %lf\n", verifierTime() + poly_v->getVT());
+    fprintf(stderr, "Total Proof Size: %lf kb\n", p->proofSize() + p->polyProofSize());
+
+    return all_pass;
 }
 
 bool verifier::verifyInnerLayers() {
     total_timer.start();
     total_slow_timer.start();
 
+    bool all_pass = true;
     F alpha = F_ONE, beta = F_ZERO, relu_rou, final_claim_u1, final_claim_v1;
     r_u[C.size].resize(C.circuit[C.size - 1].bit_length);
     for (i8 i = 0; i < C.circuit[C.size - 1].bit_length; ++i)
@@ -185,7 +202,7 @@ bool verifier::verifyInnerLayers() {
             if (cur_claim != previousSum) {
                 cerr << cur_claim << ' ' << previousSum << endl;
                 fprintf(stderr, "Verification fail, phase1, circuit %d, current bit %d\n", i, j);
-                return false;
+                all_pass = false;
             }
             previousRandom = r_u[i][j];
             previousSum = nxt_claim;
@@ -219,7 +236,7 @@ bool verifier::verifyInnerLayers() {
                 if (poly.eval(F_ZERO) + poly.eval(F_ONE) != previousSum) {
                     fprintf(stderr, "Verification fail, phase2, circuit level %d, current bit %d, total is %d\n", i, j,
                             cur.max_bl_v);
-                    return false;
+                    all_pass = false;
                 }
 
                 previousRandom = r_v[i][j];
@@ -239,7 +256,7 @@ bool verifier::verifyInnerLayers() {
         if (previousSum != test_value) {
             std::cerr << test_value << ' ' << previousSum << std::endl;
             fprintf(stderr, "Verification fail, semi final, circuit level %d\n", i);
-            return false;
+            all_pass = false;
         } else fprintf(stderr, "Verification Pass, semi final, circuit level %d\n", i);
 
         if (cur.ty == layerType::FFT || cur.ty == layerType::IFFT)
@@ -262,13 +279,14 @@ bool verifier::verifyInnerLayers() {
         beta_u.clear();
         beta_v.clear();
     }
-    return true;
+    return all_pass;
 }
 
 bool verifier::verifyFirstLayer() {
     total_slow_timer.start();
     total_timer.start();
 
+    bool all_pass = true;
     auto &cur = C.circuit[0];
 
     vector<F> sig_u(C.size - 1);
@@ -295,7 +313,7 @@ bool verifier::verifyFirstLayer() {
         auto poly = p -> sumcheckLiuUpdate(previousRandom);
         if (poly.eval(F_ZERO) + poly.eval(F_ONE) != previousSum) {
             fprintf(stderr, "Liu fail, circuit 0, current bit %d\n", j);
-            return false;
+            all_pass = false;
         }
         previousRandom = r_0[j];
         previousSum = poly.eval(previousRandom);
@@ -330,7 +348,7 @@ bool verifier::verifyFirstLayer() {
     total_timer.start();
     if (eval_in * gr != previousSum) {
         fprintf(stderr, "Liu fail, semi final, circuit 0.\n");
-        return false;
+        all_pass = false;
     }
 
     total_timer.stop();
@@ -338,11 +356,6 @@ bool verifier::verifyFirstLayer() {
     output_tb[PT_OUT_ID] = to_string_wp(p->proveTime());
     output_tb[VT_OUT_ID] = to_string_wp(verifierTime());
     output_tb[PS_OUT_ID] = to_string_wp(p -> proofSize());
-
-    fprintf(stderr, "Verification pass\n");
-    fprintf(stderr, "Prove Time %lf\n", p->proveTime());
-    fprintf(stderr, "verify time %lf = %lf + %lf(slow)\n", verifierSlowTime(), verifierTime(), verifierSlowTime() - verifierTime());
-    fprintf(stderr, "proof size = %lf kb\n", p -> proofSize());
 
     beta_g.clear();
     beta_gs.clear();
@@ -353,21 +366,21 @@ bool verifier::verifyFirstLayer() {
 
     sig_u.clear();
     sig_v.clear();
-    return true;
+    return all_pass;
 }
 
 bool verifier::verifyInput() {
+    bool all_pass = true;
     if (!poly_v -> verify(r_u[0], eval_in)) {
         fprintf(stderr, "Verification fail, final input check fail.\n");
-        return false;
+        all_pass = false;
     }
 
-    fprintf(stderr, "poly pt = %.5f, vt = %.5f, ps = %.5f\n", p -> polyProverTime(), poly_v -> getVT(), p -> polyProofSize());
     output_tb[POLY_PT_OUT_ID] = to_string_wp(p -> polyProverTime());
     output_tb[POLY_VT_OUT_ID] = to_string_wp(poly_v -> getVT());
     output_tb[POLY_PS_OUT_ID] = to_string_wp(p -> polyProofSize());
     output_tb[TOT_PT_OUT_ID] = to_string_wp(p -> polyProverTime() + p->proveTime());
     output_tb[TOT_VT_OUT_ID] = to_string_wp(poly_v -> getVT() + verifierTime());
     output_tb[TOT_PS_OUT_ID] = to_string_wp(p -> polyProofSize() + p -> proofSize());
-    return true;
+    return all_pass;
 }

@@ -26,6 +26,12 @@
 #define TOT_VT_OUT_ID 14
 #define TOT_PS_OUT_ID 15
 
+// Global configuration for fully connected network
+// Network structure: X_{i+1} = σ(W_i X_i + b_i)
+// Where each layer is n×n: W_i is n×n matrix, b_i is n×1 vector, X_i and X_{i+1} are n×1 vectors
+static const int FC_NETWORK_NUM_LAYERS = 16;   // Default Number of fully connected layers when the input is empty
+static const int FC_NETWORK_INPUT_SIZE = 1024; // Default Size n for each n×n layer (set to 1024 as requested) when the input is empty
+
 using std::cerr;
 using std::endl;
 using std::vector;
