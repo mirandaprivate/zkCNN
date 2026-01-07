@@ -70,18 +70,7 @@ class fullyConnectedNetwork: public neuralNetwork {
 public:
     explicit fullyConnectedNetwork(i64 input_output_size, i64 num_layers, i64 pparallel,
                                    const std::string &i_filename, const std::string &c_filename,
-                                   const std::string &o_filename)
-            : neuralNetwork(input_output_size, 1, 1, pparallel, i_filename, c_filename, o_filename) {
-
-        pic_channel = 1;
-        pic_size_x = input_output_size;
-        pic_size_y = 1;
-
-        for (i64 i = 0; i < num_layers; ++i) {
-            full_conn.emplace_back(input_output_size, input_output_size);
-        }
-        act_layer_cnt = RELU_SIZE; 
-    }
+                                   const std::string &o_filename);
 };
 
 #endif //ZKCNN_MODELS_HPP

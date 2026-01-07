@@ -374,3 +374,21 @@ double singleConv::calcRawNaive() {
    return tm.elapse_sec();
 }
 
+fullyConnectedNetwork::fullyConnectedNetwork(i64 input_output_size, i64 num_layers, i64 pparallel,
+                                             const std::string &i_filename, const std::string &c_filename,
+                                             const std::string &o_filename)
+        : neuralNetwork(input_output_size, 1, 1, pparallel, i_filename, "", o_filename) {
+
+    // MLP网络不需要配置文件，所有参数都是动态生成的
+    pic_channel = 1;
+    pic_size_x = input_output_size;
+    pic_size_y = 1;    // 每一层：X_{i+1} = σ(W_i X_i + b_i)
+    // W_i: n x n, b_i: n x 1
+    for (i64 i = 0; i < num_layers; ++i) {
+        full_conn.emplace_back(input_output_size, input_output_size);
+    }
+
+    // 在 zkCNN 中，对于 FC 链，act_layer_cnt 应该设为 RELU_SIZE (通常为 1)
+    // 这将确保在每一层 FC 后都添加一个 ReLU
+    act_layer_cnt = RELU_SIZE;
+}

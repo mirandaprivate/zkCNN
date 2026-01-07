@@ -1,0 +1,2 @@
+/usr/bin/ar qc libcnn_lib.a CMakeFiles/cnn_lib.dir/circuit.cpp.o CMakeFiles/cnn_lib.dir/models.cpp.o CMakeFiles/cnn_lib.dir/neuralNetwork.cpp.o CMakeFiles/cnn_lib.dir/polynomial.cpp.o CMakeFiles/cnn_lib.dir/prover.cpp.o CMakeFiles/cnn_lib.dir/utils.cpp.o CMakeFiles/cnn_lib.dir/verifier.cpp.o
+/usr/bin/ranlib libcnn_lib.a
