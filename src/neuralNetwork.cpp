@@ -144,8 +144,9 @@ void neuralNetwork::create(prover &pr, bool only_compute) {
 void neuralNetwork::inputLayer(layer &circuit) {
     initLayer(circuit, total_in_size, layerType::INPUT);
 
-    for (i64 i = 0; i < total_in_size; ++i) 
-        circuit.uni_gates.emplace_back(i, 0, 0, 0);
+    // For INPUT layer, we don't need individual uni_gates for each element
+    // as input values are directly set in calcInputLayer
+    // This avoids creating millions of unnecessary gate objects
 
     calcInputLayer(circuit);
     printLayerInfo(circuit, 0);
@@ -717,7 +718,7 @@ void neuralNetwork::initParam() {
             u32 para_size = sqr(m) * channel_in * channel_out;
             pos += para_size;
             total_para_size += para_size;
-            fprintf(stderr, "kernel weight: %11d%11lld\n", para_size, total_para_size);
+            fprintf(stderr, "kernel weight: %11u%11lld\n", para_size, total_para_size);
 
             sec[j].bias_start_id = pos;
             pos += channel_out;
@@ -742,7 +743,7 @@ void neuralNetwork::initParam() {
         u32 para_size = channel_out * channel_in;
         pos += para_size;
         total_para_size += para_size;
-        fprintf(stderr, "kernel weight: %11d%11lld\n", para_size, total_para_size);
+        fprintf(stderr, "kernel weight: %11u%11lld\n", para_size, total_para_size);
         fc.bias_start_id = pos;
         pos += channel_out;
         total_para_size += channel_out;
