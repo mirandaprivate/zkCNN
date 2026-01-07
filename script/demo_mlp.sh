@@ -33,19 +33,22 @@ monitor_memory() {
     # Redirect all output to /dev/null to ensure complete silence
     {
         while true; do
-            if [ -f /proc/self/status ]; then
-                # Read current memory stats
-                VM_PEAK=$(grep "VmPeak:" /proc/self/status | awk '{print $2}')
-                VM_HWM=$(grep "VmHWM:" /proc/self/status | awk '{print $2}')
+            if [ -f /proc/$$/status ]; then
+                # Read current memory stats (use $$ for current process)
+                VM_PEAK=$(grep "VmPeak:" /proc/$$/status | awk '{print $2}')
+                VM_HWM=$(grep "VmHWM:" /proc/$$/status | awk '{print $2}')
 
                 # Update maximums (remove ' kB' suffix and compare)
                 VM_PEAK_NUM=${VM_PEAK% kB}
                 VM_HWM_NUM=${VM_HWM% kB}
 
+                # Update global variables using file-based communication
                 if [ "$VM_PEAK_NUM" -gt "$MAX_VM_PEAK_KB" ]; then
+                    echo "$VM_PEAK_NUM" > "${MEMORY_LOG_FILE}.peak"
                     MAX_VM_PEAK_KB=$VM_PEAK_NUM
                 fi
                 if [ "$VM_HWM_NUM" -gt "$MAX_VM_HWM_KB" ]; then
+                    echo "$VM_HWM_NUM" > "${MEMORY_LOG_FILE}.hwm"
                     MAX_VM_HWM_KB=$VM_HWM_NUM
                 fi
 
@@ -68,6 +71,14 @@ cleanup() {
         wait $MONITOR_PID 2>/dev/null
     fi
 
+    # Read final values from files if available
+    if [ -f "${MEMORY_LOG_FILE}.peak" ]; then
+        MAX_VM_PEAK_KB=$(cat "${MEMORY_LOG_FILE}.peak")
+    fi
+    if [ -f "${MEMORY_LOG_FILE}.hwm" ]; then
+        MAX_VM_HWM_KB=$(cat "${MEMORY_LOG_FILE}.hwm")
+    fi
+
     # Print memory statistics
     echo ""
     echo "=================================================="
@@ -76,15 +87,25 @@ cleanup() {
     if [ "$MAX_VM_PEAK_KB" -gt 0 ]; then
         MAX_VM_PEAK_MB=$((MAX_VM_PEAK_KB / 1024))
         echo "Peak Virtual Memory (VmPeak): ${MAX_VM_PEAK_MB} MB"
+    else
+        echo "Peak Virtual Memory (VmPeak): Not recorded"
     fi
     if [ "$MAX_VM_HWM_KB" -gt 0 ]; then
         MAX_VM_HWM_MB=$((MAX_VM_HWM_KB / 1024))
         echo "Peak Physical Memory (VmHWM): ${MAX_VM_HWM_MB} MB"
+    else
+        echo "Peak Physical Memory (VmHWM): Not recorded"
     fi
 
-    # Clean up log file
+    # Clean up log files
     if [ -f "$MEMORY_LOG_FILE" ]; then
         rm -f "$MEMORY_LOG_FILE"
+    fi
+    if [ -f "${MEMORY_LOG_FILE}.peak" ]; then
+        rm -f "${MEMORY_LOG_FILE}.peak"
+    fi
+    if [ -f "${MEMORY_LOG_FILE}.hwm" ]; then
+        rm -f "${MEMORY_LOG_FILE}.hwm"
     fi
     echo "=================================================="
 }
@@ -176,6 +197,9 @@ if [ ! -f "$fc_i" ]; then
     python3 -c "
 import numpy as np
 import os
+import multiprocessing as mp
+from concurrent.futures import ProcessPoolExecutor
+import time
 
 # 从环境变量获取参数
 n = int(os.environ['FC_INPUT_OUTPUT_SIZE'])
@@ -185,20 +209,40 @@ fc_c = os.environ['fc_c']
 
 print(f'Generating int8 data for {layers} layers of {n}x{n}...')
 
-# 使用 int8 范围的整数 (-128 到 127)
-# 1. 输入向量 X_0 (n x 1)
-input_vec = np.random.randint(-128, 128, size=(n,)).astype(np.float32)
-
-# 2. 权重和偏置
-params = []
-for i in range(layers):
+def generate_layer_weights(layer_idx):
+    '''生成单层权重和偏置'''
     # W_i (n x n)
     W = np.random.randint(-128, 128, size=(n, n)).astype(np.float32)
     # b_i (n x 1)
     b = np.random.randint(-128, 128, size=(n,)).astype(np.float32)
-    
-    params.extend(W.flatten())
-    params.extend(b)
+    return layer_idx, W.flatten(), b
+
+start_time = time.time()
+
+# 使用 int8 范围的整数 (-128 到 127)
+# 1. 输入向量 X_0 (n x 1)
+input_vec = np.random.randint(-128, 128, size=(n,)).astype(np.float32)
+
+# 2. 并行生成权重和偏置
+print(f'Using {min(mp.cpu_count(), layers)} processes for parallel generation...')
+
+params = []
+layer_indices = list(range(layers))
+
+with ProcessPoolExecutor(max_workers=min(mp.cpu_count(), layers)) as executor:
+    # 提交所有层的生成任务
+    futures = [executor.submit(generate_layer_weights, i) for i in layer_indices]
+
+    # 按顺序收集结果
+    results = [None] * layers
+    for future in futures:
+        layer_idx, W_flat, b = future.result()
+        results[layer_idx] = (W_flat, b)
+
+    # 按层顺序合并参数
+    for W_flat, b in results:
+        params.extend(W_flat)
+        params.extend(b)
 
 # 合并所有数据
 all_data = np.concatenate([input_vec, np.array(params)])
@@ -210,7 +254,9 @@ np.savetxt(fc_i, all_data.reshape(1, -1), delimiter='\t', fmt='%.1f')
 config_data = np.array([[1.0, 0.0]], dtype=np.float32)
 np.savetxt(fc_c, config_data, delimiter='\t', fmt='%.1f')
 
+elapsed_time = time.time() - start_time
 print(f'Data generation complete. Total elements: {len(all_data)}')
+print(f'Parallel generation time: {elapsed_time:.2f} seconds')
 "
 fi
 
