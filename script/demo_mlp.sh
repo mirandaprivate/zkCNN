@@ -25,58 +25,68 @@ set -x
 # Memory Monitoring Setup
 # ==================================================
 MEMORY_LOG_FILE="/tmp/zkcnn_memory_$$.log"
+ZKCNN_PID=""
 MAX_VM_PEAK_KB=0
 MAX_VM_HWM_KB=0
 
-# Function to monitor memory usage (completely silent)
+# Function to monitor memory usage (monitor the actual zkCNN process)
 monitor_memory() {
+    local pid=$1
+    local log_file=$2
+
     # Redirect all output to /dev/null to ensure complete silence
     {
         while true; do
-            if [ -f /proc/$$/status ]; then
-                # Read current memory stats (use $$ for current process)
-                VM_PEAK=$(grep "VmPeak:" /proc/$$/status | awk '{print $2}')
-                VM_HWM=$(grep "VmHWM:" /proc/$$/status | awk '{print $2}')
+            if [ -f "/proc/$pid/status" ] && kill -0 $pid 2>/dev/null; then
+                # Read current memory stats for the zkCNN process
+                VM_PEAK=$(grep "VmPeak:" /proc/$pid/status | awk '{print $2}')
+                VM_HWM=$(grep "VmHWM:" /proc/$pid/status | awk '{print $2}')
 
-                # Update maximums (remove ' kB' suffix and compare)
+                # Remove ' kB' suffix and convert to numbers
                 VM_PEAK_NUM=${VM_PEAK% kB}
                 VM_HWM_NUM=${VM_HWM% kB}
 
-                # Update global variables using file-based communication
-                if [ "$VM_PEAK_NUM" -gt "$MAX_VM_PEAK_KB" ]; then
-                    echo "$VM_PEAK_NUM" > "${MEMORY_LOG_FILE}.peak"
-                    MAX_VM_PEAK_KB=$VM_PEAK_NUM
+                # Update maximums using file-based communication
+                if [ "$VM_PEAK_NUM" -gt "$MAX_VM_PEAK_KB" ] 2>/dev/null; then
+                    echo "$VM_PEAK_NUM" > "${log_file}.peak"
                 fi
-                if [ "$VM_HWM_NUM" -gt "$MAX_VM_HWM_KB" ]; then
-                    echo "$VM_HWM_NUM" > "${MEMORY_LOG_FILE}.hwm"
-                    MAX_VM_HWM_KB=$VM_HWM_NUM
+                if [ "$VM_HWM_NUM" -gt "$MAX_VM_HWM_KB" ] 2>/dev/null; then
+                    echo "$VM_HWM_NUM" > "${log_file}.hwm"
                 fi
 
-                # Log to file (no console output)
-                echo "$(date +%s) $VM_PEAK_NUM $VM_HWM_NUM" >> "$MEMORY_LOG_FILE"
+                # Log timestamp and memory values
+                echo "$(date +%s) $VM_PEAK_NUM $VM_HWM_NUM" >> "$log_file"
+            else
+                # Process no longer exists, exit monitoring
+                break
             fi
             sleep 1
         done
     } >/dev/null 2>&1
 }
 
-# Start memory monitoring in background
-monitor_memory &
-MONITOR_PID=$!
+# Function to start memory monitoring for a specific PID
+start_memory_monitoring() {
+    local pid=$1
+    monitor_memory "$pid" "$MEMORY_LOG_FILE" &
+    MONITOR_PID=$!
+    ZKCNN_PID=$pid
+}
 
 # Cleanup function
 cleanup() {
+    # Kill memory monitor if still running
     if [ ! -z "$MONITOR_PID" ]; then
         kill $MONITOR_PID 2>/dev/null
         wait $MONITOR_PID 2>/dev/null
     fi
 
-    # Read final values from files if available
+    # Read final memory values from files
     if [ -f "${MEMORY_LOG_FILE}.peak" ]; then
-        MAX_VM_PEAK_KB=$(cat "${MEMORY_LOG_FILE}.peak")
+        MAX_VM_PEAK_KB=$(cat "${MEMORY_LOG_FILE}.peak" 2>/dev/null || echo "0")
     fi
     if [ -f "${MEMORY_LOG_FILE}.hwm" ]; then
-        MAX_VM_HWM_KB=$(cat "${MEMORY_LOG_FILE}.hwm")
+        MAX_VM_HWM_KB=$(cat "${MEMORY_LOG_FILE}.hwm" 2>/dev/null || echo "0")
     fi
 
     # Print memory statistics
@@ -98,15 +108,7 @@ cleanup() {
     fi
 
     # Clean up log files
-    if [ -f "$MEMORY_LOG_FILE" ]; then
-        rm -f "$MEMORY_LOG_FILE"
-    fi
-    if [ -f "${MEMORY_LOG_FILE}.peak" ]; then
-        rm -f "${MEMORY_LOG_FILE}.peak"
-    fi
-    if [ -f "${MEMORY_LOG_FILE}.hwm" ]; then
-        rm -f "${MEMORY_LOG_FILE}.hwm"
-    fi
+    rm -f "$MEMORY_LOG_FILE" "${MEMORY_LOG_FILE}.peak" "${MEMORY_LOG_FILE}.hwm" 2>/dev/null
     echo "=================================================="
 }
 
@@ -266,8 +268,34 @@ echo "Using $FC_MAX_THREADS threads for data generation (proof uses pic_cnt=1)"
 echo "Memory monitoring active (check every 1 second)"
 # pic_cnt is the 4th argument of the binary; keep it 1 (one input) to match generated data
 # We pass n and num_layers as 5th/6th arguments to configure the circuit
-${run_file} ${fc_i} ${fc_c} ${fc_o} 1 ${FC_INPUT_OUTPUT_SIZE} ${FC_NUM_LAYERS} > ${out_file}
 
+# Start zkCNN program and monitor its memory usage
+echo "Starting zkCNN program..."
+${run_file} ${fc_i} ${fc_c} ${fc_o} 1 ${FC_INPUT_OUTPUT_SIZE} ${FC_NUM_LAYERS} > ${out_file} &
+ZKCNN_PID=$!
+
+# Wait a moment for the process to start
+sleep 2
+
+# Start memory monitoring for the zkCNN process
+if kill -0 $ZKCNN_PID 2>/dev/null; then
+    echo "Starting memory monitoring for PID $ZKCNN_PID..."
+    start_memory_monitoring $ZKCNN_PID
+else
+    echo "Warning: zkCNN process failed to start"
+fi
+
+# Wait for the program to finish
+wait $ZKCNN_PID 2>/dev/null
+exit_code=$?
+
+# Stop memory monitoring
+if [ ! -z "$MONITOR_PID" ]; then
+    kill $MONITOR_PID 2>/dev/null
+    wait $MONITOR_PID 2>/dev/null
+fi
+
+# Print completion message
 echo ""
 echo "=================================================="
 echo "Proof generation completed!"
@@ -282,4 +310,7 @@ echo ""
 echo "Output files:"
 echo "  - Results: ${out_file}"
 echo "  - Inference: ${fc_o}"
-echo "=================================================="
+
+# Cleanup will be called automatically by trap EXIT
+# Return the exit code
+exit $exit_code
