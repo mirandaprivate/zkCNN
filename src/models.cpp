@@ -373,3 +373,4 @@ double singleConv::calcRawNaive() {
    tm.stop();
    return tm.elapse_sec();
 }
+
