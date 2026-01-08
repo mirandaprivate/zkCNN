@@ -138,9 +138,24 @@ bool verifier::verify() {
         fprintf(stderr, "Final Verification fail\n");
     }
 
-    fprintf(stderr, "Total Prove Time (GKR + Poly): %lf\n", p->proveTime() + p->polyProverTime());
-    fprintf(stderr, "Total Verify Time: %lf\n", verifierTime() + poly_v->getVT());
-    fprintf(stderr, "Total Proof Size: %lf kb\n", p->proofSize() + p->polyProofSize());
+    // Report prover times separately and in total
+    double gkr_pt = p->proveTime();
+    double poly_pt = p->polyProverTime();
+    fprintf(stderr, "Prove Time (GKR only): %lf\n", gkr_pt);
+    fprintf(stderr, "Prove Time (Poly only): %lf\n", poly_pt);
+    fprintf(stderr, "Prove Time (Total): %lf\n", gkr_pt + poly_pt);
+
+    double gkr_ps = p->proofSize();
+    double poly_ps = p->polyProofSize();
+    fprintf(stderr, "Proof Size (GKR only): %lf kb\n", gkr_ps);
+    fprintf(stderr, "Proof Size (Poly only): %lf kb\n", poly_ps);
+    fprintf(stderr, "Proof Size (Total): %lf kb\n", gkr_ps + poly_ps);
+
+    double gkr_vt = verifierTime();
+    double poly_vt = poly_v->getVT();
+    fprintf(stderr, "Verify Time (GKR only): %lf\n", gkr_vt);
+    fprintf(stderr, "Verify Time (Poly only): %lf\n", poly_vt);
+    fprintf(stderr, "Verify Time (Total): %lf\n", gkr_vt + poly_vt);
 
     return all_pass;
 }

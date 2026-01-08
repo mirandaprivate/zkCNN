@@ -140,10 +140,6 @@ if [ "$FC_INPUT_OUTPUT_SIZE" -lt 1 ] || [ "$FC_INPUT_OUTPUT_SIZE" -gt 1024 ]; th
     exit 1
 fi
 
-if [ "$FC_NUM_LAYERS" -lt 1 ] || [ "$FC_NUM_LAYERS" -gt 1024 ]; then
-    echo "Error: FC_NUM_LAYERS must be between 1 and 1024"
-    exit 1
-fi
 
 if [ "$FC_MAX_THREADS" -lt 1 ] || [ "$FC_MAX_THREADS" -gt 256 ]; then
     echo "Error: FC_MAX_THREADS must be between 1 and 256"
@@ -194,7 +190,7 @@ if [ ! -f "$fc_i" ]; then
     echo "Generating test data for $FC_NUM_LAYERS-layer MLP network (${FC_INPUT_OUTPUT_SIZE}x${FC_INPUT_OUTPUT_SIZE})..."
 
     # Set environment variables for Python
-    export FC_INPUT_OUTPUT_SIZE FC_NUM_LAYERS fc_i fc_c
+    export FC_INPUT_OUTPUT_SIZE FC_NUM_LAYERS FC_MAX_THREADS fc_i fc_c
 
     python3 -c "
 import numpy as np
@@ -203,16 +199,17 @@ import multiprocessing as mp
 from concurrent.futures import ProcessPoolExecutor
 import time
 
-# 从环境变量获取参数
+# Read parameters from environment variables
 n = int(os.environ['FC_INPUT_OUTPUT_SIZE'])
 layers = int(os.environ['FC_NUM_LAYERS'])
+max_threads_env = int(os.environ.get('FC_MAX_THREADS', mp.cpu_count()))
 fc_i = os.environ['fc_i']
 fc_c = os.environ['fc_c']
 
 print(f'Generating int8 data for {layers} layers of {n}x{n}...')
 
 def generate_layer_weights(layer_idx):
-    '''生成单层权重和偏置'''
+    '''Generate weights and bias for a single layer'''
     # W_i (n x n)
     W = np.random.randint(-128, 128, size=(n, n)).astype(np.float32)
     # b_i (n x 1)
@@ -221,38 +218,39 @@ def generate_layer_weights(layer_idx):
 
 start_time = time.time()
 
-# 使用 int8 范围的整数 (-128 到 127)
-# 1. 输入向量 X_0 (n x 1)
+# Use int8 range (-128 to 127)
+# 1. Input vector X_0 (n x 1)
 input_vec = np.random.randint(-128, 128, size=(n,)).astype(np.float32)
 
-# 2. 并行生成权重和偏置
-print(f'Using {min(mp.cpu_count(), layers)} processes for parallel generation...')
+# 2. Generate weights and biases in parallel
+max_workers = min(max_threads_env, mp.cpu_count(), layers)
+print(f'Using {max_workers} processes for parallel generation...')
 
 params = []
 layer_indices = list(range(layers))
 
-with ProcessPoolExecutor(max_workers=min(mp.cpu_count(), layers)) as executor:
-    # 提交所有层的生成任务
+with ProcessPoolExecutor(max_workers=max_workers) as executor:
+    # Submit tasks for all layers
     futures = [executor.submit(generate_layer_weights, i) for i in layer_indices]
 
-    # 按顺序收集结果
+    # Collect results in order
     results = [None] * layers
     for future in futures:
         layer_idx, W_flat, b = future.result()
         results[layer_idx] = (W_flat, b)
 
-    # 按层顺序合并参数
+    # Merge parameters in layer order
     for W_flat, b in results:
         params.extend(W_flat)
         params.extend(b)
 
-# 合并所有数据
+# Concatenate all data
 all_data = np.concatenate([input_vec, np.array(params)])
 
-# 使用制表符分隔
+# Use tab delimiter
 np.savetxt(fc_i, all_data.reshape(1, -1), delimiter='\t', fmt='%.1f')
 
-# 3. 配置文件 (虽然 zkCNN 内部动态计算，但仍生成一个占位)
+# 3. Config file (placeholder; zkCNN computes internally)
 config_data = np.array([[1.0, 0.0]], dtype=np.float32)
 np.savetxt(fc_c, config_data, delimiter='\t', fmt='%.1f')
 

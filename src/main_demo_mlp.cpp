@@ -48,7 +48,11 @@ int main(int argc, char **argv) {
     fullyConnectedNetwork nn(input_output_size, num_layers, pic_cnt, i_filename, c_filename, o_filename);
     nn.create(p, false);
     verifier v(&p, p.C);
-    v.verify();
+    // 即便验证失败也不要中断后续文件输出或脚本流程
+    bool verify_ok = v.verify();
+    if (!verify_ok) {
+        fprintf(stderr, "Verification failed, continue running to keep outputs available.\n");
+    }
 
     for (auto &s: output_tb) printf("%s, ", s.c_str());
     puts("");
