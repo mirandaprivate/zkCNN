@@ -128,8 +128,11 @@ bool verifier::verify() {
     poly_v = std::make_unique<hyrax_bls12_381::polyVerifier>(p -> commitInput(gens), gens);
     
     bool inner_ok = verifyInnerLayers();
+    fprintf(stderr, "verifyInnerLayers finished, result=%d\n", (int)inner_ok);
     bool first_ok = verifyFirstLayer();
+    fprintf(stderr, "verifyFirstLayer finished, result=%d\n", (int)first_ok);
     bool input_ok = verifyInput();
+    fprintf(stderr, "verifyInput finished, result=%d\n", (int)input_ok);
     bool all_pass = inner_ok && first_ok && input_ok;
 
     if (all_pass) {
@@ -356,6 +359,7 @@ bool verifier::verifyFirstLayer() {
 }
 
 bool verifier::verifyInput() {
+    fprintf(stderr, "verifyInput start\n");
     bool all_pass = true;
     if (!poly_v -> verify(r_u[0], eval_in)) {
         fprintf(stderr, "Verification fail, final input check fail.\n");
@@ -368,5 +372,6 @@ bool verifier::verifyInput() {
     output_tb[TOT_PT_OUT_ID] = to_string_wp(p -> polyProverTime() + p->proveTime());
     output_tb[TOT_VT_OUT_ID] = to_string_wp(poly_v -> getVT() + verifierTime());
     output_tb[TOT_PS_OUT_ID] = to_string_wp(p -> polyProofSize() + p -> proofSize());
+    fprintf(stderr, "verifyInput end, result=%d\n", (int)all_pass);
     return all_pass;
 }
