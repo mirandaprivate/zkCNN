@@ -172,17 +172,12 @@ bool verifier::verifyInnerLayers() {
     vector<F>::const_iterator r_0 = r_u[C.size].begin();
     vector<F>::const_iterator r_1;
 
-    total_timer.stop();
-    total_slow_timer.stop();
-
     auto previousSum = p->Vres(r_0, C.circuit[C.size - 1].size, C.circuit[C.size - 1].bit_length);
     p -> sumcheckInitAll(r_0);
 
     for (u32 i = C.size - 1; i; --i) {
         auto &cur = C.circuit[i];
         p->sumcheckInit(alpha, beta);
-        total_timer.start();
-        total_slow_timer.start();
 
         // phase 1
         r_u[i].resize(cur.max_bl_u);
@@ -191,8 +186,6 @@ bool verifier::verifyInnerLayers() {
             relu_rou.setByCSPRNG();
         else relu_rou = F_ONE;
 
-        total_timer.stop();
-        total_slow_timer.stop();
         if (cur.ty == layerType::DOT_PROD)
             p->sumcheckDotProdInitPhase1();
         else p->sumcheckInitPhase1(relu_rou);
@@ -202,14 +195,10 @@ bool verifier::verifyInnerLayers() {
             F cur_claim, nxt_claim;
             if (cur.ty == layerType::DOT_PROD) {
                 cubic_poly poly = p->sumcheckDotProdUpdate1(previousRandom);
-                total_timer.start();
-                total_slow_timer.start();
                 cur_claim = poly.eval(F_ZERO) + poly.eval(F_ONE);
                 nxt_claim = poly.eval(r_u[i][j]);
             } else {
                 quadratic_poly poly = p->sumcheckUpdate1(previousRandom);
-                total_timer.start();
-                total_slow_timer.start();
                 cur_claim = poly.eval(F_ZERO) + poly.eval(F_ONE);
                 nxt_claim = poly.eval(r_u[i][j]);
             }
@@ -221,33 +210,24 @@ bool verifier::verifyInnerLayers() {
             }
             previousRandom = r_u[i][j];
             previousSum = nxt_claim;
-            total_timer.stop();
-            total_slow_timer.stop();
         }
 
         if (cur.ty == layerType::DOT_PROD)
             p->sumcheckDotProdFinalize1(previousRandom, final_claim_u1);
         else p->sumcheckFinalize1(previousRandom, final_claim_u0[i], final_claim_u1);
 
-        total_slow_timer.start();
         betaInitPhase1(i, alpha, beta, r_0, r_1, relu_rou);
         predicatePhase1(i);
 
-        total_timer.start();
         if (cur.need_phase2) {
             r_v[i].resize(cur.max_bl_v);
             for (int j = 0; j < cur.max_bl_v; ++j) r_v[i][j].setByCSPRNG();
-
-            total_timer.stop();
-            total_slow_timer.stop();
 
             p->sumcheckInitPhase2();
             previousRandom = F_ZERO;
             for (u32 j = 0; j < cur.max_bl_v; ++j) {
                 quadratic_poly poly = p->sumcheckUpdate2(previousRandom);
 
-                total_timer.start();
-                total_slow_timer.start();
                 if (poly.eval(F_ZERO) + poly.eval(F_ONE) != previousSum) {
                     fprintf(stderr, "Verification fail, phase2, circuit level %d, current bit %d, total is %d\n", i, j,
                             cur.max_bl_v);
@@ -256,15 +236,11 @@ bool verifier::verifyInnerLayers() {
 
                 previousRandom = r_v[i][j];
                 previousSum = poly.eval(previousRandom);
-                total_timer.stop();
-                total_slow_timer.stop();
             }
             p->sumcheckFinalize2(previousRandom, final_claim_v0[i], final_claim_v1);
 
-            total_slow_timer.start();
             betaInitPhase2(i);
             predicatePhase2(i);
-            total_timer.start();
         }
         F test_value = getFinalValue(final_claim_u0[i], final_claim_u1, final_claim_v0[i], final_claim_v1);
 
@@ -288,12 +264,11 @@ bool verifier::verifyInnerLayers() {
 
         r_0 = r_u[i].begin();
         r_1 = r_v[i].begin();
-
-        total_timer.stop();
-        total_slow_timer.stop();
         beta_u.clear();
         beta_v.clear();
     }
+    total_timer.stop();
+    total_slow_timer.stop();
     return all_pass;
 }
 
@@ -319,8 +294,6 @@ bool verifier::verifyFirstLayer() {
         if (~C.circuit[i].bit_length_v[0])
             previousSum = previousSum + sig_v[i - 1] * final_claim_v0[i];
     }
-    total_timer.stop();
-    total_slow_timer.stop();
 
     p->sumcheckLiuInit(sig_u, sig_v);
     F previousRandom = F_ZERO;
@@ -360,12 +333,10 @@ bool verifier::verifyFirstLayer() {
     beta_u.clear();
     beta_v.clear();
 
-    total_timer.start();
     if (eval_in * gr != previousSum) {
         fprintf(stderr, "Liu fail, semi final, circuit 0.\n");
         all_pass = false;
     }
-
     total_timer.stop();
     total_slow_timer.stop();
     output_tb[PT_OUT_ID] = to_string_wp(p->proveTime());
