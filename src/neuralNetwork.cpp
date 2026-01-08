@@ -822,7 +822,10 @@ void neuralNetwork::calcInputLayer(layer &circuit) {
     for (i64 ci = 0; ci < pic_channel; ++ci)
         for (i64 x = 0; x < pic_size_x; ++x)
             for (i64 y = 0; y < pic_size_y; ++y) {
-                in >> num;
+                if (!(in >> num)) {
+                    fprintf(stderr, "Error: Failed to read input data at channel %lld, x %lld, y %lld\n", ci, x, y);
+                    exit(1);
+                }
                 input_dat.push_back(num);
                 mx = max(mx, num);
                 mn = min(mn, num);
@@ -853,7 +856,10 @@ void neuralNetwork::readConvWeight(i64 first_conv_id) {
         for (i64 ci = 0; ci < channel_in; ++ci)
             for (i64 x = 0; x < m; ++x)
                 for (i64 y = 0; y < m; ++y) {
-                    in >> num;
+                    if (!(in >> num)) {
+                        fprintf(stderr, "Error: Failed to read Conv weights at co %lld, ci %lld, x %lld, y %lld\n", co, ci, x, y);
+                        exit(1);
+                    }
                     input_dat.push_back(num);
                     mx = max(mx, num);
                     mn = min(mn, num);
@@ -874,7 +880,10 @@ void neuralNetwork::readBias(i64 first_bias_id) {
     double num, mx = -10000, mn = 10000;
     vector<double> input_dat;
     for (i64 co = 0; co < channel_out; ++co) {
-        in >> num;
+        if (!(in >> num)) {
+            fprintf(stderr, "Error: Failed to read bias at co %lld\n", co);
+            exit(1);
+        }
         input_dat.push_back(num);
         mx = max(mx, num);
         mn = min(mn, num);
@@ -891,7 +900,10 @@ void neuralNetwork::readFconWeight(i64 first_fc_id) {
     vector<double> input_dat;
     for (i64 co = 0; co < channel_out; ++co)
         for (i64 ci = 0; ci < channel_in; ++ci) {
-            in >> num;
+            if (!(in >> num)) {
+                fprintf(stderr, "Error: Failed to read FC weights at co %lld, ci %lld\n", co, ci);
+                exit(1);
+            }
             input_dat.push_back(num);
             mx = max(mx, num);
             mn = min(mn, num);

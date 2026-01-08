@@ -185,14 +185,13 @@ echo ""
 # Create data directory if it doesn't exist
 mkdir -p ../data/mlp${FC_INPUT_OUTPUT_SIZE}x${FC_NUM_LAYERS}
 
-# Generate test data if it doesn't exist
-if [ ! -f "$fc_i" ]; then
-    echo "Generating test data for $FC_NUM_LAYERS-layer MLP network (${FC_INPUT_OUTPUT_SIZE}x${FC_INPUT_OUTPUT_SIZE})..."
+# Generate test data (always regenerate to ensure data integrity)
+echo "Generating test data for $FC_NUM_LAYERS-layer MLP network (${FC_INPUT_OUTPUT_SIZE}x${FC_INPUT_OUTPUT_SIZE})..."
 
-    # Set environment variables for Python
-    export FC_INPUT_OUTPUT_SIZE FC_NUM_LAYERS FC_MAX_THREADS fc_i fc_c
+# Set environment variables for Python
+export FC_INPUT_OUTPUT_SIZE FC_NUM_LAYERS FC_MAX_THREADS fc_i fc_c
 
-    python3 -c "
+python3 -c "
 import numpy as np
 import os
 import multiprocessing as mp
@@ -258,7 +257,6 @@ elapsed_time = time.time() - start_time
 print(f'Data generation complete. Total elements: {len(all_data)}')
 print(f'Parallel generation time: {elapsed_time:.2f} seconds')
 "
-fi
 
 echo "Running $FC_NUM_LAYERS-layer MLP network proof generation..."
 echo "Network structure: X_{i+1} = σ(W_i X_i + b_i) for each layer"
