@@ -127,10 +127,10 @@ bool verifier::verify() {
 
     poly_v = std::make_unique<hyrax_bls12_381::polyVerifier>(p -> commitInput(gens), gens);
     
-    bool all_pass = true;
-    all_pass = verifyInnerLayers() && all_pass;
-    all_pass = verifyFirstLayer() && all_pass;
-    all_pass = verifyInput() && all_pass;
+    bool inner_ok = verifyInnerLayers();
+    bool first_ok = verifyFirstLayer();
+    bool input_ok = verifyInput();
+    bool all_pass = inner_ok && first_ok && input_ok;
 
     if (all_pass) {
         fprintf(stderr, "Final Verification pass\n");
