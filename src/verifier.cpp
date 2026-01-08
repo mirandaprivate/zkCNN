@@ -183,6 +183,8 @@ bool verifier::verifyInnerLayers() {
 
     for (u32 i = C.size - 1; i; --i) {
         auto &cur = C.circuit[i];
+        total_timer.stop();
+        total_slow_timer.stop();
         p->sumcheckInit(alpha, beta);
         total_timer.start();
         total_slow_timer.start();
@@ -228,6 +230,8 @@ bool verifier::verifyInnerLayers() {
             total_slow_timer.stop();
         }
 
+        total_timer.stop();
+        total_slow_timer.stop();
         if (cur.ty == layerType::DOT_PROD)
             p->sumcheckDotProdFinalize1(previousRandom, final_claim_u1);
         else p->sumcheckFinalize1(previousRandom, final_claim_u0[i], final_claim_u1);
@@ -262,6 +266,8 @@ bool verifier::verifyInnerLayers() {
                 total_timer.stop();
                 total_slow_timer.stop();
             }
+            total_timer.stop();
+            total_slow_timer.stop();
             p->sumcheckFinalize2(previousRandom, final_claim_v0[i], final_claim_v1);
 
             total_slow_timer.start();
@@ -326,16 +332,22 @@ bool verifier::verifyFirstLayer() {
             previousSum = previousSum + sig_v[i - 1] * final_claim_v0[i];
     }
 
+    total_timer.stop();
+    total_slow_timer.stop();
     p->sumcheckLiuInit(sig_u, sig_v);
     F previousRandom = F_ZERO;
     for (int j = 0; j < cur.bit_length; ++j) {
         auto poly = p -> sumcheckLiuUpdate(previousRandom);
+        total_timer.start();
+        total_slow_timer.start();
         if (poly.eval(F_ZERO) + poly.eval(F_ONE) != previousSum) {
             fprintf(stderr, "Liu fail, circuit 0, current bit %d\n", j);
             all_pass = false;
         }
         previousRandom = r_0[j];
         previousSum = poly.eval(previousRandom);
+        total_timer.stop();
+        total_slow_timer.stop();
     }
 
     F gr = F_ZERO;
@@ -343,7 +355,7 @@ bool verifier::verifyFirstLayer() {
 
     beta_g.resize(1ULL << cur.bit_length);
 
-    total_timer.stop();
+    total_slow_timer.start();
     initBetaTable(beta_g, cur.bit_length, r_0, F_ONE);
     for (int i = 1; i < C.size; ++i) {
         if (~C.circuit[i].bit_length_u[0]) {
