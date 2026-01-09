@@ -293,14 +293,16 @@ bool verifier::verifyInnerLayers() {
             }
 
             if (cur_claim != previousSum) {
-                cerr << cur_claim << ' ' << previousSum << endl;
-                fprintf(stderr, "Verification fail, phase1, circuit %d, current bit %d\n", i, j);
                 all_pass = false;
             }
             previousRandom = r_u[i][j];
             previousSum = nxt_claim;
         total_timer.stop();
         total_slow_timer.stop();
+        }
+
+        if (all_pass == false) {
+             fprintf(stderr, "Verification fail at layer %d\n", i);
         }
 
         if (cur.ty == layerType::DOT_PROD)
@@ -332,8 +334,6 @@ bool verifier::verifyInnerLayers() {
                 total_timer.start();
                 total_slow_timer.start();
                 if (poly.eval(F_ZERO) + poly.eval(F_ONE) != previousSum) {
-                    fprintf(stderr, "Verification fail, phase2, circuit level %d, current bit %d, total is %d\n", i, j,
-                            cur.max_bl_v);
                     all_pass = false;
                 }
 

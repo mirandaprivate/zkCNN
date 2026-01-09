@@ -60,8 +60,6 @@ void prover::sumcheckInit(const F &alpha_0, const F &beta_0) {
  * This is to initialize before the phase 1 of a single inner production layer.
  */
 void prover::sumcheckDotProdInitPhase1() {
-    fprintf(stderr, "sumcheck level %d, phase1 init start\n", sumcheck_id);
-
     auto &cur = C.circuit[sumcheck_id];
     i8 fft_bl = cur.fft_bit_length;
     i8 cnt_bl = cur.bit_length - fft_bl;
@@ -116,30 +114,38 @@ cubic_poly prover::sumcheckDotProdUpdate1(const F &previous_random) {
 
     if (total[0] == 1)
         tmp_mult[0] = tmp_mult[0].eval(previous_random);
-    else for (u32 i = 0; i < (total[0] >> 1); ++i) {
-        u32 g0 = i << 1, g1 = i << 1 | 1;
-        tmp_mult[i] = interpolate(tmp_mult[g0].eval(previous_random), tmp_mult[g1].eval(previous_random));
+    else {
+        vector<linear_poly> next_mult(total[0] >> 1);
+        #pragma omp parallel for
+        for (u32 i = 0; i < (total[0] >> 1); ++i) {
+            u32 g0 = i << 1, g1 = i << 1 | 1;
+            next_mult[i] = interpolate(tmp_mult[g0].eval(previous_random), tmp_mult[g1].eval(previous_random));
+        }
+        tmp_mult = next_mult;
     }
     total[0] >>= 1;
 
     cubic_poly ret;
+    vector<linear_poly> next_v0(total[1] >> 1), next_v1(total[1] >> 1);
     #pragma omp parallel for reduction(+:ret)
     for (u32 i = 0; i < (total[1] >> 1); ++i) {
         u32 g0 = i << 1, g1 = i << 1 | 1;
         if (g0 >= total_size[1]) {
-            tmp_v0[i].clear();
-            tmp_v1[i].clear();
+            next_v0[i].clear();
+            next_v1[i].clear();
             continue;
         }
         if (g1 >= total_size[1]) {
-            tmp_v0[g1].clear();
-            tmp_v1[g1].clear();
+            next_v0[g1].clear();
+            next_v1[g1].clear();
         }
-        tmp_v0[i] = interpolate(tmp_v0[g0].eval(previous_random), tmp_v0[g1].eval(previous_random));
-        tmp_v1[i] = interpolate(tmp_v1[g0].eval(previous_random), tmp_v1[g1].eval(previous_random));
-        if (total[0]) ret = ret + tmp_mult[i & total[0] - 1] * tmp_v1[i] * tmp_v0[i];
-        else ret = ret + tmp_mult[0] * tmp_v1[i] * tmp_v0[i];
+        next_v0[i] = interpolate(tmp_v0[g0].eval(previous_random), tmp_v0[g1].eval(previous_random));
+        next_v1[i] = interpolate(tmp_v1[g0].eval(previous_random), tmp_v1[g1].eval(previous_random));
+        if (total[0]) ret = ret + tmp_mult[i & total[0] - 1] * next_v1[i] * next_v0[i];
+        else ret = ret + tmp_mult[0] * next_v1[i] * next_v0[i];
     }
+    tmp_v0 = next_v0;
+    tmp_v1 = next_v1;
     proof_size += F_BYTE_SIZE * (3 + (!ret.a.isZero()));
 
     total[1] >>= 1;
@@ -159,8 +165,6 @@ void prover::sumcheckDotProdFinalize1(const F &previous_random, F &claim_1) {
 }
 
 void prover::sumcheckInitPhase1(const F &relu_rou_0) {
-    fprintf(stderr, "sumcheck level %d, phase1 init start\n", sumcheck_id);
-
     auto &cur = C.circuit[sumcheck_id];
     total[0] = ~cur.bit_length_u[0] ? 1ULL << cur.bit_length_u[0] : 0;
     total_size[0] = cur.size_u[0];
@@ -252,12 +256,9 @@ void prover::sumcheckInitPhase1(const F &relu_rou_0) {
 
     round = 0;
     prove_timer.stop();
-    fprintf(stderr, "sumcheck level %d, phase1 init finished\n", sumcheck_id);
 }
 
 void prover::sumcheckInitPhase2() {
-    fprintf(stderr, "sumcheck level %d, phase2 init start\n", sumcheck_id);
-
     auto &cur = C.circuit[sumcheck_id];
     total[0] = ~cur.bit_length_v[0] ? 1ULL << cur.bit_length_v[0] : 0;
     total_size[0] = cur.size_v[0];
@@ -424,22 +425,25 @@ quadratic_poly prover::sumcheckUpdateEach(const F &previous_random, bool idx) {
     }
 
     quadratic_poly ret;
+    vector<linear_poly> next_v(total[idx] >> 1), next_mult(total[idx] >> 1);
     #pragma omp parallel for reduction(+:ret)
     for (u64 i = 0; i < (total[idx] >> 1); ++i) {
         u64 g0 = i << 1, g1 = i << 1 | 1;
         if (g0 >= total_size[idx]) {
-            tmp_v[i].clear();
-            tmp_mult[i].clear();
+            next_v[i].clear();
+            next_mult[i].clear();
             continue;
         }
         if (g1 >= total_size[idx]) {
-            tmp_v[g1].clear();
-            tmp_mult[g1].clear();
+            next_v[g1].clear();
+            next_mult[g1].clear();
         }
-        tmp_v[i] = interpolate(tmp_v[g0].eval(previous_random), tmp_v[g1].eval(previous_random));
-        tmp_mult[i] = interpolate(tmp_mult[g0].eval(previous_random), tmp_mult[g1].eval(previous_random));
-        ret = ret + tmp_mult[i] * tmp_v[i];
+        next_v[i] = interpolate(tmp_v[g0].eval(previous_random), tmp_v[g1].eval(previous_random));
+        next_mult[i] = interpolate(tmp_mult[g0].eval(previous_random), tmp_mult[g1].eval(previous_random));
+        ret = ret + next_mult[i] * next_v[i];
     }
+    tmp_v = next_v;
+    tmp_mult = next_mult;
     total[idx] >>= 1;
     total_size[idx] = (total_size[idx] + 1) >> 1;
 
@@ -460,16 +464,17 @@ F prover::Vres(const vector<F>::const_iterator &r, u64 output_size, u32 r_size) 
         output[i] = val[C.size - 1][i];
     u64 whole = 1ULL << r_size;
     for (u32 i = 0; i < r_size; ++i) {
+        u64 next_whole = whole >> 1;
+        vector<F> next_output(next_whole);
         #pragma omp parallel for
-        for (u64 j = 0; j < (whole >> 1); ++j) {
-            if (j > 0)
-                output[j].clear();
-            if ((j << 1) < output_size)
-                output[j] = output[j << 1] * (F_ONE - r[i]);
-            if ((j << 1 | 1) < output_size)
-                output[j] = output[j] + output[j << 1 | 1] * (r[i]);
+        for (u64 j = 0; j < next_whole; ++j) {
+            F v0 = (j << 1) < output_size ? output[j << 1] : F_ZERO;
+            F v1 = (j << 1 | 1) < output_size ? output[j << 1 | 1] : F_ZERO;
+            next_output[j] = v0 * (F_ONE - r[i]) + v1 * (r[i]);
         }
-        whole >>= 1;
+        output = next_output;
+        whole = next_whole;
+        output_size = (output_size + 1) >> 1;
     }
     F res = output[0];
 
