@@ -47,6 +47,7 @@ public:
 
     layeredCircuit C;
     vector<vector<F>> val;        // the output of each gate
+    void freeWitness() { val.clear(); val.shrink_to_fit(); }
 private:
     quadratic_poly sumcheckUpdateEach(const F &previous_random, bool idx);
     quadratic_poly sumcheckUpdate(const F &previous_random, vector<F> &r_arr);

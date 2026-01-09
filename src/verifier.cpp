@@ -191,6 +191,8 @@ bool verifier::verify() {
     fprintf(stderr, "verifyInnerLayers finished, result=%d\n", (int)inner_ok);
     bool first_ok = verifyFirstLayer();
     fprintf(stderr, "verifyFirstLayer finished, result=%d\n", (int)first_ok);
+    // 释放 prover 的中间 witness，避免后续 poly 验证占用峰值内存
+    p->freeWitness();
     bool input_ok = verifyInput();
     fprintf(stderr, "verifyInput finished, result=%d\n", (int)input_ok);
     bool all_pass = inner_ok && first_ok && input_ok;
