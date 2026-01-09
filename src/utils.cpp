@@ -35,6 +35,7 @@ void initHalfTable(vector<F> &beta_f, vector<F> &beta_s, const vector<F>::const_
     beta_s.at(0) = F_ONE;
 
     for (u32 i = 0; i < first_half; ++i) {
+        #pragma omp parallel for
         for (u64 j = 0; j < (1ULL << i); ++j) {
             auto tmp = beta_f.at(j) * r[i];
             beta_f.at(j | (1ULL << i)) = tmp;
@@ -43,6 +44,7 @@ void initHalfTable(vector<F> &beta_f, vector<F> &beta_s, const vector<F>::const_
     }
 
     for (u32 i = 0; i < second_half; ++i) {
+        #pragma omp parallel for
         for (u64 j = 0; j < (1ULL << i); ++j) {
             auto tmp = beta_s[j] * r[(i + first_half)];
             beta_s[j | (1ULL << i)] = tmp;
