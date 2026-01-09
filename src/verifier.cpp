@@ -8,6 +8,9 @@
 #include <circuit.h>
 #include <iostream>
 #include "sha256.hpp"
+#include <omp.h>
+
+#pragma omp declare reduction(+: Fr: omp_out = omp_out + omp_in) initializer(omp_priv = Fr(0))
 
 static void dummy_hash() {
     SHA256 h;
@@ -111,13 +114,24 @@ void verifier::predicatePhase1(u32 layer_id) {
 
     uni_value[0].clear();
     uni_value[1].clear();
-    if (cur_layer.ty == layerType::FFT || cur_layer.ty == layerType::IFFT)
+    if (cur_layer.ty == layerType::FFT || cur_layer.ty == layerType::IFFT) {
+        F v1 = F_ZERO;
+        #pragma omp parallel for reduction(+:v1)
         for (u64 u = 0; u < 1ULL << cur_layer.max_bl_u; ++u)
-            uni_value[1] = uni_value[1] + beta_gs[u] * beta_u[u];
-    else for (auto &gate: cur_layer.uni_gates) {
+            v1 = v1 + beta_gs[u] * beta_u[u];
+        uni_value[1] = v1;
+    } else {
+        F v0 = F_ZERO, v1 = F_ZERO;
+        #pragma omp parallel for reduction(+:v0, v1)
+        for (u32 i = 0; i < cur_layer.uni_gates.size(); ++i) {
+            auto &gate = cur_layer.uni_gates[i];
             bool idx = gate.lu;
-            uni_value[idx] = uni_value[idx] + beta_g[gate.g] * beta_u[gate.u] * C.two_mul[gate.sc];
+            if (!idx) v0 = v0 + beta_g[gate.g] * beta_u[gate.u] * C.two_mul[gate.sc];
+            else v1 = v1 + beta_g[gate.g] * beta_u[gate.u] * C.two_mul[gate.sc];
         }
+        uni_value[0] = v0;
+        uni_value[1] = v1;
+    }
     bin_value[0] = bin_value[1] = bin_value[2] = F_ZERO;
 }
 
@@ -127,12 +141,30 @@ void verifier::predicatePhase2(u32 layer_id) {
 
     auto &cur_layer = C.circuit[layer_id];
     if (C.circuit[layer_id].ty == layerType::DOT_PROD) {
-        for (auto &gate: cur_layer.bin_gates)
-            bin_value[gate.l] =
-                    bin_value[gate.l] +
-                    beta_g[gate.g] * beta_u[gate.u] * beta_v[gate.v];
-    } else for (auto &gate: cur_layer.bin_gates)
-        bin_value[gate.l] = bin_value[gate.l] + beta_g[gate.g] * beta_u[gate.u] * beta_v[gate.v] * C.two_mul[gate.sc];
+        F b0 = F_ZERO, b1 = F_ZERO, b2 = F_ZERO;
+        #pragma omp parallel for reduction(+:b0, b1, b2)
+        for (u32 i = 0; i < cur_layer.bin_gates.size(); ++i) {
+            auto &gate = cur_layer.bin_gates[i];
+            if (gate.l == 0) b0 = b0 + beta_g[gate.g] * beta_u[gate.u] * beta_v[gate.v];
+            else if (gate.l == 1) b1 = b1 + beta_g[gate.g] * beta_u[gate.u] * beta_v[gate.v];
+            else b2 = b2 + beta_g[gate.g] * beta_u[gate.u] * beta_v[gate.v];
+        }
+        bin_value[0] = b0;
+        bin_value[1] = b1;
+        bin_value[2] = b2;
+    } else {
+        F b0 = F_ZERO, b1 = F_ZERO, b2 = F_ZERO;
+        #pragma omp parallel for reduction(+:b0, b1, b2)
+        for (u32 i = 0; i < cur_layer.bin_gates.size(); ++i) {
+            auto &gate = cur_layer.bin_gates[i];
+            if (gate.l == 0) b0 = b0 + beta_g[gate.g] * beta_u[gate.u] * beta_v[gate.v] * C.two_mul[gate.sc];
+            else if (gate.l == 1) b1 = b1 + beta_g[gate.g] * beta_u[gate.u] * beta_v[gate.v] * C.two_mul[gate.sc];
+            else b2 = b2 + beta_g[gate.g] * beta_u[gate.u] * beta_v[gate.v] * C.two_mul[gate.sc];
+        }
+        bin_value[0] = b0;
+        bin_value[1] = b1;
+        bin_value[2] = b2;
+    }
 }
 
 bool verifier::verify() {

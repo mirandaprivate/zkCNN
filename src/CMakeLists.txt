@@ -7,6 +7,9 @@ add_library(cnn_lib STATIC
     utils.cpp
     verifier.cpp
 )
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(cnn_lib PUBLIC OpenMP::OpenMP_CXX)
+endif()
 
 # 确保目标按正确顺序链接
 add_executable(demo_vgg_run main_demo_vgg.cpp)

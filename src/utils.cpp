@@ -6,6 +6,7 @@
 #include <iostream>
 #include <hyrax-bls12-381/polyCommit.hpp>
 #include "utils.hpp"
+#include <omp.h>
 
 using std::cerr;
 using std::endl;
@@ -153,13 +154,18 @@ initBetaTable(vector<F> &beta_g, u32 gLength, const vector<F>::const_iterator &r
     vector<F> beta_f(1ULL << first_half), beta_s(1ULL << second_half);
     if (!beta.isZero()) {
         initHalfTable(beta_f, beta_s, r_1, beta, first_half, second_half);
+        #pragma omp parallel for
         for (u64 i = 0; i < (1ULL << gLength); ++i)
             beta_g[i] = beta_f[i & mask_fhalf] * beta_s[i >> first_half];
-    } else for (u64 i = 0; i < (1ULL << gLength); ++i)
-        beta_g[i].clear();
+    } else {
+        #pragma omp parallel for
+        for (u64 i = 0; i < (1ULL << gLength); ++i)
+            beta_g[i].clear();
+    }
 
     if (alpha.isZero()) return;
     initHalfTable(beta_f, beta_s, r_0, alpha, first_half, second_half);
+    #pragma omp parallel for
     for (u64 i = 0; i < (1ULL << gLength); ++i)
         beta_g[i] = beta_g[i] + beta_f[i & mask_fhalf] * beta_s[i >> first_half];
 }
@@ -173,10 +179,14 @@ void initBetaTable(vector<F> &beta_g, u32 gLength, const vector<F>::const_iterat
 
     if (!init.isZero()) {
         initHalfTable(beta_f, beta_s, r, init, first_half, second_half);
+        #pragma omp parallel for
         for (u64 i = 0; i < (1ULL << gLength); ++i)
             beta_g[i] = beta_f[i & mask_fhalf] * beta_s[i >> first_half];
-    } else for (u64 i = 0; i < (1ULL << gLength); ++i)
-        beta_g[i].clear();
+    } else {
+        #pragma omp parallel for
+        for (u64 i = 0; i < (1ULL << gLength); ++i)
+            beta_g[i].clear();
+    }
 }
 
 bool check(long x, long y, long nx, long ny) {

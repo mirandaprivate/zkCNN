@@ -5,6 +5,11 @@
 #include "prover.hpp"
 #include <iostream>
 #include <utils.hpp>
+#include <omp.h>
+
+#pragma omp declare reduction(+: quadratic_poly: omp_out = omp_out + omp_in) initializer(omp_priv = quadratic_poly())
+#pragma omp declare reduction(+: cubic_poly: omp_out = omp_out + omp_in) initializer(omp_priv = cubic_poly())
+#pragma omp declare reduction(+: Fr: omp_out = omp_out + omp_in) initializer(omp_priv = Fr(0))
 
 static vector<F> beta_gs, beta_u;
 
@@ -118,6 +123,7 @@ cubic_poly prover::sumcheckDotProdUpdate1(const F &previous_random) {
     total[0] >>= 1;
 
     cubic_poly ret;
+    #pragma omp parallel for reduction(+:ret)
     for (u32 i = 0; i < (total[1] >> 1); ++i) {
         u32 g0 = i << 1, g1 = i << 1 | 1;
         if (g0 >= total_size[1]) {
@@ -404,6 +410,7 @@ quadratic_poly prover::sumcheckUpdateEach(const F &previous_random, bool idx) {
     }
 
     quadratic_poly ret;
+    #pragma omp parallel for reduction(+:ret)
     for (u64 i = 0; i < (total[idx] >> 1); ++i) {
         u64 g0 = i << 1, g1 = i << 1 | 1;
         if (g0 >= total_size[idx]) {
@@ -439,6 +446,7 @@ F prover::Vres(const vector<F>::const_iterator &r, u64 output_size, u32 r_size) 
         output[i] = val[C.size - 1][i];
     u64 whole = 1ULL << r_size;
     for (u32 i = 0; i < r_size; ++i) {
+        #pragma omp parallel for
         for (u64 j = 0; j < (whole >> 1); ++j) {
             if (j > 0)
                 output[j].clear();
