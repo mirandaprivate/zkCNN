@@ -302,7 +302,7 @@ bool verifier::verifyInnerLayers() {
         }
 
         if (all_pass == false) {
-             fprintf(stderr, "Verification fail at layer %d\n", i);
+             // fprintf(stderr, "Verification fail at layer %d\n", i);
         }
 
         if (cur.ty == layerType::DOT_PROD)

@@ -356,20 +356,22 @@ void prover::sumcheckLiuInit(const vector<F> &s_u, const vector<F> &s_v) {
         i8 bit_length_i = C.circuit[i].bit_length_u[0];
         u64 size_i = C.circuit[i].size_u[0];
         if (~bit_length_i) {
-            initBetaTable(beta_g, (u32)bit_length_i, r_u[i].begin(), s_u[i - 1]);
+            vector<F> beta_g_local;
+            initBetaTable(beta_g_local, (u32)bit_length_i, r_u[i].begin(), s_u[i - 1]);
             for (u64 hu = 0; hu < size_i; ++hu) {
                 u64 u = C.circuit[i].ori_id_u[hu];
-                mult_array[1][u] = mult_array[1][u] + beta_g[hu];
+                mult_array[1][u] = mult_array[1][u] + beta_g_local[hu];
             }
         }
 
         bit_length_i = C.circuit[i].bit_length_v[0];
         size_i = C.circuit[i].size_v[0];
         if (~bit_length_i) {
-            initBetaTable(beta_g, (u32)bit_length_i, r_v[i].begin(), s_v[i - 1]);
+            vector<F> beta_g_v_local;
+            initBetaTable(beta_g_v_local, (u32)bit_length_i, r_v[i].begin(), s_v[i - 1]);
             for (u64 hv = 0; hv < size_i; ++hv) {
                 u64 v = C.circuit[i].ori_id_v[hv];
-                mult_array[1][v] = mult_array[1][v] + beta_g[hv];
+                mult_array[1][v] = mult_array[1][v] + beta_g_v_local[hv];
             }
         }
     }

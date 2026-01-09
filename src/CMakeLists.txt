@@ -9,6 +9,7 @@ add_library(cnn_lib STATIC
 )
 if(OpenMP_CXX_FOUND)
     target_link_libraries(cnn_lib PUBLIC OpenMP::OpenMP_CXX)
+    target_compile_options(cnn_lib PUBLIC ${OpenMP_CXX_FLAGS})
 endif()
 
 # 确保目标按正确顺序链接

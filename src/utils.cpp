@@ -35,20 +35,38 @@ void initHalfTable(vector<F> &beta_f, vector<F> &beta_s, const vector<F>::const_
     beta_s.at(0) = F_ONE;
 
     for (u32 i = 0; i < first_half; ++i) {
-        #pragma omp parallel for
-        for (u64 j = 0; j < (1ULL << i); ++j) {
-            auto tmp = beta_f.at(j) * r[i];
-            beta_f.at(j | (1ULL << i)) = tmp;
-            beta_f.at(j) = beta_f[j] - tmp;
+        u64 current_size = 1ULL << i;
+        if (current_size > 1024) {
+            #pragma omp parallel for
+            for (u64 j = 0; j < current_size; ++j) {
+                auto tmp = beta_f.at(j) * r[i];
+                beta_f.at(j | (1ULL << i)) = tmp;
+                beta_f.at(j) = beta_f[j] - tmp;
+            }
+        } else {
+            for (u64 j = 0; j < current_size; ++j) {
+                auto tmp = beta_f.at(j) * r[i];
+                beta_f.at(j | (1ULL << i)) = tmp;
+                beta_f.at(j) = beta_f[j] - tmp;
+            }
         }
     }
 
     for (u32 i = 0; i < second_half; ++i) {
-        #pragma omp parallel for
-        for (u64 j = 0; j < (1ULL << i); ++j) {
-            auto tmp = beta_s[j] * r[(i + first_half)];
-            beta_s[j | (1ULL << i)] = tmp;
-            beta_s[j] = beta_s[j] - tmp;
+        u64 current_size = 1ULL << i;
+        if (current_size > 1024) {
+            #pragma omp parallel for
+            for (u64 j = 0; j < current_size; ++j) {
+                auto tmp = beta_s[j] * r[(i + first_half)];
+                beta_s[j | (1ULL << i)] = tmp;
+                beta_s[j] = beta_s[j] - tmp;
+            }
+        } else {
+            for (u64 j = 0; j < current_size; ++j) {
+                auto tmp = beta_s[j] * r[(i + first_half)];
+                beta_s[j | (1ULL << i)] = tmp;
+                beta_s[j] = beta_s[j] - tmp;
+            }
         }
     }
 }
@@ -181,13 +199,27 @@ void initBetaTable(vector<F> &beta_g, u32 gLength, const vector<F>::const_iterat
 
     if (!init.isZero()) {
         initHalfTable(beta_f, beta_s, r, init, first_half, second_half);
-        #pragma omp parallel for
-        for (u64 i = 0; i < (1ULL << gLength); ++i)
-            beta_g[i] = beta_f[i & mask_fhalf] * beta_s[i >> first_half];
+        beta_g.resize(1ULL << gLength);
+        u64 total_size_local = 1ULL << gLength;
+        if (total_size_local > 1024) {
+            #pragma omp parallel for
+            for (u64 i = 0; i < total_size_local; ++i)
+                beta_g[i] = beta_f[i & mask_fhalf] * beta_s[i >> first_half];
+        } else {
+            for (u64 i = 0; i < total_size_local; ++i)
+                beta_g[i] = beta_f[i & mask_fhalf] * beta_s[i >> first_half];
+        }
     } else {
-        #pragma omp parallel for
-        for (u64 i = 0; i < (1ULL << gLength); ++i)
-            beta_g[i].clear();
+        beta_g.resize(1ULL << gLength);
+        u64 total_size_local = 1ULL << gLength;
+        if (total_size_local > 1024) {
+            #pragma omp parallel for
+            for (u64 i = 0; i < total_size_local; ++i)
+                beta_g[i].clear();
+        } else {
+            for (u64 i = 0; i < total_size_local; ++i)
+                beta_g[i].clear();
+        }
     }
 }
 
