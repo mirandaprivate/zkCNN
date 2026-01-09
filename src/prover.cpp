@@ -125,8 +125,10 @@ cubic_poly prover::sumcheckDotProdUpdate1(const F &previous_random) {
     }
     total[0] >>= 1;
 
+    static vector<linear_poly> next_v0, next_v1, next_mult_scratch;
+    next_v0.resize(total[1] >> 1);
+    next_v1.resize(total[1] >> 1);
     cubic_poly ret;
-    vector<linear_poly> next_v0(total[1] >> 1), next_v1(total[1] >> 1);
     #pragma omp parallel for reduction(+:ret)
     for (u32 i = 0; i < (total[1] >> 1); ++i) {
         u32 g0 = i << 1, g1 = i << 1 | 1;
@@ -426,8 +428,10 @@ quadratic_poly prover::sumcheckUpdateEach(const F &previous_random, bool idx) {
         add_term = add_term + tmp_v[0].b * tmp_mult[0].b;
     }
 
+    static vector<linear_poly> next_v, next_mult;
+    next_v.resize(total[idx] >> 1);
+    next_mult.resize(total[idx] >> 1);
     quadratic_poly ret;
-    vector<linear_poly> next_v(total[idx] >> 1), next_mult(total[idx] >> 1);
     #pragma omp parallel for reduction(+:ret)
     for (u64 i = 0; i < (total[idx] >> 1); ++i) {
         u64 g0 = i << 1, g1 = i << 1 | 1;

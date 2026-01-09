@@ -9,6 +9,7 @@
 #include <circuit.h>
 #include <iostream>
 #include <cmath>
+#include <omp.h>
 
 using std::cerr;
 using std::endl;
@@ -949,19 +950,34 @@ void neuralNetwork::calcNormalLayer(const layer &circuit, i64 layer_id) {
     val[layer_id].resize(circuit.size);
     for (auto &x: val[layer_id]) x.clear();
 
-    for (auto &gate: circuit.uni_gates) {
-        val[layer_id].at(gate.g) = val[layer_id].at(gate.g) + val[gate.lu].at(gate.u) * two_mul[gate.sc];
+    // 为避免并发累加冲突，按输出索引分桶，再并行按 g 聚合
+    std::vector<std::vector<size_t>> uni_of_g(circuit.size);
+    std::vector<std::vector<size_t>> bin_of_g(circuit.size);
+    uni_of_g.shrink_to_fit(); // 释放多余容量
+    bin_of_g.shrink_to_fit();
+    for (size_t idx = 0; idx < circuit.uni_gates.size(); ++idx) {
+        const auto &gate = circuit.uni_gates[idx];
+        if (gate.g < (u64)circuit.size) uni_of_g[gate.g].push_back(idx);
+    }
+    for (size_t idx = 0; idx < circuit.bin_gates.size(); ++idx) {
+        const auto &gate = circuit.bin_gates[idx];
+        if (gate.g < (u64)circuit.size) bin_of_g[gate.g].push_back(idx);
     }
 
-
-    for (auto &gate: circuit.bin_gates) {
-        u32 bin_lu = gate.getLayerIdU(layer_id), bin_lv = gate.getLayerIdV(layer_id);
-        val[layer_id].at(gate.g) = val[layer_id].at(gate.g) + val[bin_lu].at(gate.u) * val[bin_lv][gate.v] * two_mul[gate.sc];
+    #pragma omp parallel for
+    for (i64 g = 0; g < circuit.size; ++g) {
+        F acc = F_ZERO;
+        for (size_t idx : uni_of_g[g]) {
+            const auto &gate = circuit.uni_gates[idx];
+            acc = acc + val[gate.lu].at(gate.u) * two_mul[gate.sc];
+        }
+        for (size_t idx : bin_of_g[g]) {
+            const auto &gate = circuit.bin_gates[idx];
+            u32 bin_lu = gate.getLayerIdU(layer_id), bin_lv = gate.getLayerIdV(layer_id);
+            acc = acc + val[bin_lu].at(gate.u) * val[bin_lv][gate.v] * two_mul[gate.sc];
+        }
+        val[layer_id].at(g) = acc * circuit.scale;
     }
-
-    F mx_val = F_ZERO, mn_val = F_ZERO;
-    for (i64 g = 0; g < circuit.size; ++g)
-        val[layer_id].at(g) = val[layer_id].at(g) * circuit.scale;
 }
 
 void neuralNetwork::calcDotProdLayer(const layer &circuit, i64 layer_id) {
@@ -971,10 +987,14 @@ void neuralNetwork::calcDotProdLayer(const layer &circuit, i64 layer_id) {
     char fft_bit = circuit.fft_bit_length;
     u32 fft_len = 1 << fft_bit;
     u32 l = layer_id - 1;
-    for (auto &gate: circuit.bin_gates)
-        for (int s = 0; s < fft_len; ++s)
-            val[layer_id][gate.g << fft_bit | s] = val[layer_id][gate.g << fft_bit | s] +
-                    val[l][gate.u << fft_bit | s] * val[l][gate.v << fft_bit | s];
+    // dotProd 层内的 (gate.g, s) 组合互不重叠，可安全并行
+    #pragma omp parallel for collapse(2)
+    for (size_t gi = 0; gi < circuit.bin_gates.size(); ++gi)
+        for (int s = 0; s < (int)fft_len; ++s) {
+            const auto &gate = circuit.bin_gates[gi];
+            u32 idx = (gate.g << fft_bit) | s;
+            val[layer_id][idx] = val[l][gate.u << fft_bit | s] * val[l][gate.v << fft_bit | s];
+        }
 }
 
 void neuralNetwork::calcFFTLayer(const layer &circuit, i64 layer_id) {
@@ -986,7 +1006,8 @@ void neuralNetwork::calcFFTLayer(const layer &circuit, i64 layer_id) {
         for (i64 block = 0; block < circuit.size / fft_lenh; ++block) {
             i64 c = block * fft_lenh;
             i64 d = block * fft_len;
-            std::vector<F> arr(fft_len, F_ZERO);
+            thread_local std::vector<F> arr;
+            arr.assign(fft_len, F_ZERO);
             for (i64 j = c; j < c + fft_lenh; ++j) arr[j - c] = val[layer_id - 1].at(j);
             for (i64 j = fft_lenh; j < fft_len; ++j) arr[j].clear();
             fft(arr, circuit.fft_bit_length, circuit.ty == layerType::IFFT);
@@ -997,7 +1018,8 @@ void neuralNetwork::calcFFTLayer(const layer &circuit, i64 layer_id) {
         for (i64 block = 0; block < circuit.size / fft_len; ++block) {
             i64 d = block * fft_len;
             i64 c = block * fft_lenh;
-            std::vector<F> arr(fft_len, F_ZERO);
+            thread_local std::vector<F> arr;
+            arr.assign(fft_len, F_ZERO);
             for (i64 j = d; j < d + fft_len; ++j) arr[j - d] = val[layer_id - 1].at(j);
             fft(arr, circuit.fft_bit_length, circuit.ty == layerType::IFFT);
             for (i64 j = c; j < c + fft_lenh; ++j) val[layer_id].at(j) = arr[j - c];
