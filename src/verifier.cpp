@@ -7,6 +7,26 @@
 #include <utils.hpp>
 #include <circuit.h>
 #include <iostream>
+#include "sha256.hpp"
+
+static void dummy_hash() {
+    SHA256 h;
+    unsigned char buf[32];
+    static F a, b;
+    static bool init = false;
+    if (!init) {
+        a.setStr("1234567890123456789012345678901234567890");
+        b.setStr("9876543210987654321098765432109876543210");
+        init = true;
+    }
+    F res;
+    uint8_t data[F_BYTE_SIZE * 2];
+    a.serialize(data, F_BYTE_SIZE);
+    b.serialize(data + F_BYTE_SIZE, F_BYTE_SIZE);
+    h.update(data, F_BYTE_SIZE * 2);
+    h.final(buf);
+    res.setBigEndianMod(buf, 32);
+}
 
 vector<F> beta_v;
 static vector<F> beta_u, beta_gs;
@@ -116,17 +136,25 @@ void verifier::predicatePhase2(u32 layer_id) {
 }
 
 bool verifier::verify() {
+    total_timer.start();
+    total_slow_timer.start();
+
     u32 logn = C.circuit[0].bit_length;
     u64 n_sqrt = 1ULL << (logn - (logn >> 1));
     vector<G> gens(n_sqrt);
     for (auto &x: gens) {
         Fr tmp;
+        dummy_hash();
         tmp.setByCSPRNG();
         x = mcl::bn::getG1basePoint() * tmp;
     }
 
+    total_timer.stop();
+    total_slow_timer.stop();
     poly_v = std::make_unique<hyrax_bls12_381::polyVerifier>(p -> commitInput(gens), gens);
-    
+    total_timer.start();
+    total_slow_timer.start();
+
     bool inner_ok = verifyInnerLayers();
     fprintf(stderr, "verifyInnerLayers finished, result=%d\n", (int)inner_ok);
     bool first_ok = verifyFirstLayer();
@@ -160,18 +188,20 @@ bool verifier::verify() {
     fprintf(stderr, "Verify Time (Poly only): %lf\n", poly_vt);
     fprintf(stderr, "Verify Time (Total): %lf\n", gkr_vt + poly_vt);
 
+    total_timer.stop();
+    total_slow_timer.stop();
     return all_pass;
 }
 
 bool verifier::verifyInnerLayers() {
-    total_timer.start();
-    total_slow_timer.start();
 
     bool all_pass = true;
     F alpha = F_ONE, beta = F_ZERO, relu_rou, final_claim_u1, final_claim_v1;
     r_u[C.size].resize(C.circuit[C.size - 1].bit_length);
-    for (i8 i = 0; i < C.circuit[C.size - 1].bit_length; ++i)
+    for (i8 i = 0; i < C.circuit[C.size - 1].bit_length; ++i) {
+        dummy_hash();
         r_u[C.size][i].setByCSPRNG();
+    }
     vector<F>::const_iterator r_0 = r_u[C.size].begin();
     vector<F>::const_iterator r_1;
 
@@ -179,7 +209,11 @@ bool verifier::verifyInnerLayers() {
     total_slow_timer.stop();
 
     auto previousSum = p->Vres(r_0, C.circuit[C.size - 1].size, C.circuit[C.size - 1].bit_length);
+    total_timer.start();
+    total_slow_timer.start();
     p -> sumcheckInitAll(r_0);
+    total_timer.stop();
+    total_slow_timer.stop();
 
     for (u32 i = C.size - 1; i; --i) {
         auto &cur = C.circuit[i];
@@ -189,18 +223,25 @@ bool verifier::verifyInnerLayers() {
         total_timer.start();
         total_slow_timer.start();
 
-        // phase 1
-        r_u[i].resize(cur.max_bl_u);
-        for (int j = 0; j < cur.max_bl_u; ++j) r_u[i][j].setByCSPRNG();
-        if (cur.zero_start_id < cur.size)
-            relu_rou.setByCSPRNG();
-        else relu_rou = F_ONE;
-
         total_timer.stop();
         total_slow_timer.stop();
         if (cur.ty == layerType::DOT_PROD)
             p->sumcheckDotProdInitPhase1();
         else p->sumcheckInitPhase1(relu_rou);
+        total_timer.start();
+        total_slow_timer.start();
+
+        // phase 1
+        r_u[i].resize(cur.max_bl_u);
+        for (int j = 0; j < cur.max_bl_u; ++j) {
+            dummy_hash();
+            r_u[i][j].setByCSPRNG();
+        }
+        if (cur.zero_start_id < cur.size) {
+            dummy_hash();
+            relu_rou.setByCSPRNG();
+        }
+        else relu_rou = F_ONE;
 
         F previousRandom = F_ZERO;
         for (i8 j = 0; j < cur.max_bl_u; ++j) {
@@ -226,12 +267,10 @@ bool verifier::verifyInnerLayers() {
             }
             previousRandom = r_u[i][j];
             previousSum = nxt_claim;
-            total_timer.stop();
-            total_slow_timer.stop();
-        }
-
         total_timer.stop();
         total_slow_timer.stop();
+        }
+
         if (cur.ty == layerType::DOT_PROD)
             p->sumcheckDotProdFinalize1(previousRandom, final_claim_u1);
         else p->sumcheckFinalize1(previousRandom, final_claim_u0[i], final_claim_u1);
@@ -239,11 +278,16 @@ bool verifier::verifyInnerLayers() {
         total_slow_timer.start();
         betaInitPhase1(i, alpha, beta, r_0, r_1, relu_rou);
         predicatePhase1(i);
+        total_slow_timer.stop();
 
         total_timer.start();
+        total_slow_timer.start();
         if (cur.need_phase2) {
             r_v[i].resize(cur.max_bl_v);
-            for (int j = 0; j < cur.max_bl_v; ++j) r_v[i][j].setByCSPRNG();
+            for (int j = 0; j < cur.max_bl_v; ++j) {
+                dummy_hash();
+                r_v[i][j].setByCSPRNG();
+            }
 
             total_timer.stop();
             total_slow_timer.stop();
@@ -273,8 +317,10 @@ bool verifier::verifyInnerLayers() {
             total_slow_timer.start();
             betaInitPhase2(i);
             predicatePhase2(i);
-            total_timer.start();
+            total_slow_timer.stop();
         }
+        total_timer.start();
+        total_slow_timer.start();
         F test_value = getFinalValue(final_claim_u0[i], final_claim_u1, final_claim_v0[i], final_claim_v1);
 
         if (previousSum != test_value) {
@@ -286,11 +332,15 @@ bool verifier::verifyInnerLayers() {
         if (cur.ty == layerType::FFT || cur.ty == layerType::IFFT)
             previousSum = final_claim_u1;
         else {
-            if (~cur.bit_length_u[1])
+            if (~cur.bit_length_u[1]) {
+                dummy_hash();
                 alpha.setByCSPRNG();
+            }
             else alpha.clear();
-            if ((~cur.bit_length_v[1]) || cur.ty == layerType::FFT)
+            if ((~cur.bit_length_v[1]) || cur.ty == layerType::FFT) {
+                dummy_hash();
                 beta.setByCSPRNG();
+            }
             else beta.clear();
             previousSum = alpha * final_claim_u1 + beta * final_claim_v1;
         }
@@ -298,30 +348,34 @@ bool verifier::verifyInnerLayers() {
         r_0 = r_u[i].begin();
         r_1 = r_v[i].begin();
 
-        total_timer.stop();
-        total_slow_timer.stop();
         beta_u.clear();
         beta_v.clear();
     }
-    total_timer.stop();
-    total_slow_timer.stop();
     return all_pass;
 }
 
 
 bool verifier::verifyFirstLayer() {
     total_slow_timer.start();
-    total_timer.start();
 
     bool all_pass = true;
     auto &cur = C.circuit[0];
 
     vector<F> sig_u(C.size - 1);
-    for (int i = 0; i < C.size - 1; ++i) sig_u[i].setByCSPRNG();
+    for (int i = 0; i < C.size - 1; ++i) {
+        dummy_hash();
+        sig_u[i].setByCSPRNG();
+    }
     vector<F> sig_v(C.size - 1);
-    for (int i = 0; i < C.size - 1; ++i) sig_v[i].setByCSPRNG();
+    for (int i = 0; i < C.size - 1; ++i) {
+        dummy_hash();
+        sig_v[i].setByCSPRNG();
+    }
     r_u[0].resize(cur.bit_length);
-    for (int i = 0; i < cur.bit_length; ++i) r_u[0][i].setByCSPRNG();
+    for (int i = 0; i < cur.bit_length; ++i) {
+        dummy_hash();
+        r_u[0][i].setByCSPRNG();
+    }
     auto r_0 = r_u[0].begin();
 
     F previousSum = F_ZERO;
@@ -372,7 +426,9 @@ bool verifier::verifyFirstLayer() {
                 gr = gr + beta_g[C.circuit[i].ori_id_v[j]] * beta_v[j];
         }
     }
+    total_slow_timer.stop();
     total_timer.start();
+    total_slow_timer.start();
 
     beta_u.clear();
     beta_v.clear();
