@@ -981,16 +981,27 @@ void neuralNetwork::calcFFTLayer(const layer &circuit, i64 layer_id) {
     i64 fft_len = 1ULL << circuit.fft_bit_length;
     i64 fft_lenh = fft_len >> 1;
     val[layer_id].resize(circuit.size);
-    std::vector<F> arr(fft_len, F_ZERO);
-    if (circuit.ty == layerType::FFT) for (i64 c = 0, d = 0; d < circuit.size; c += fft_lenh, d += fft_len) {
-        for (i64 j = c; j < c + fft_lenh; ++j) arr[j - c] = val[layer_id - 1].at(j);
-        for (i64 j = fft_lenh; j < fft_len; ++j) arr[j].clear();
-        fft(arr, circuit.fft_bit_length, circuit.ty == layerType::IFFT);
-        for (i64 j = d; j < d + fft_len; ++j) val[layer_id].at(j) = arr[j - d];
-    } else for (u32 c = 0, d = 0; c < circuit.size; c += fft_lenh, d += fft_len) {
-        for (i64 j = d; j < d + fft_len; ++j) arr[j - d] = val[layer_id - 1].at(j);
-        fft(arr, circuit.fft_bit_length, circuit.ty == layerType::IFFT);
-        for (i64 j = c; j < c + fft_lenh; ++j) val[layer_id].at(j) = arr[j - c];
+    if (circuit.ty == layerType::FFT) {
+        #pragma omp parallel for
+        for (i64 block = 0; block < circuit.size / fft_lenh; ++block) {
+            i64 c = block * fft_lenh;
+            i64 d = block * fft_len;
+            std::vector<F> arr(fft_len, F_ZERO);
+            for (i64 j = c; j < c + fft_lenh; ++j) arr[j - c] = val[layer_id - 1].at(j);
+            for (i64 j = fft_lenh; j < fft_len; ++j) arr[j].clear();
+            fft(arr, circuit.fft_bit_length, circuit.ty == layerType::IFFT);
+            for (i64 j = d; j < d + fft_len; ++j) val[layer_id].at(j) = arr[j - d];
+        }
+    } else {
+        #pragma omp parallel for
+        for (i64 block = 0; block < circuit.size / fft_len; ++block) {
+            i64 d = block * fft_len;
+            i64 c = block * fft_lenh;
+            std::vector<F> arr(fft_len, F_ZERO);
+            for (i64 j = d; j < d + fft_len; ++j) arr[j - d] = val[layer_id - 1].at(j);
+            fft(arr, circuit.fft_bit_length, circuit.ty == layerType::IFFT);
+            for (i64 j = c; j < c + fft_lenh; ++j) val[layer_id].at(j) = arr[j - c];
+        }
     }
 }
 
