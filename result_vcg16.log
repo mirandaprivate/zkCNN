@@ -1,0 +1,135 @@
+===== KEY METRICS (single-thread, OMP_NUM_THREADS=1) =====
+offline_parameter_commit_time_sec: 24.7325
+online_prover_time_sec: 128.210954
+proof_size_kb: 537.906250
+verifier_time_sec: 0.095455
+----- details -----
+online_prover_gkr_only_sec: 123.736390
+poly_prover_time_sec_includes_commit: 29.207064
+total_prover_time_sec: 152.943454
+note: online_prover_time = Prove Time (Total) - commit time
+=====
+=== vgg16 single-thread experiment ===
+OMP_NUM_THREADS=1
+NOTE: synthetic weights (no official vgg16 weights in data.tar.gz)
+host=arm64 date_start=Sun Aug 23 17:47:50 CST 2026
+kernel weight:        1728       1728
+bias   weight:          64       1792
+kernel weight:       36864      38656
+bias   weight:          64      38720
+kernel weight:       73728     112448
+bias   weight:         128     112576
+kernel weight:      147456     260032
+bias   weight:         128     260160
+kernel weight:      294912     555072
+bias   weight:         256     555328
+kernel weight:      589824    1145152
+bias   weight:         256    1145408
+kernel weight:      589824    1735232
+bias   weight:         256    1735488
+kernel weight:     1179648    2915136
+bias   weight:         512    2915648
+kernel weight:     2359296    5274944
+bias   weight:         512    5275456
+kernel weight:     2359296    7634752
+bias   weight:         512    7635264
+kernel weight:     2359296    9994560
+bias   weight:         512    9995072
+kernel weight:     2359296   12354368
+bias   weight:         512   12354880
+kernel weight:     2359296   14714176
+bias   weight:         512   14714688
+kernel weight:      262144   14976832
+bias   weight:         512   14977344
+kernel weight:      262144   15239488
+bias   weight:         512   15240000
+kernel weight:        5120   15245120
+bias   weight:          10   15245130
+SIZE: 47
+33647434 (2^26) = 15248202 (45.32% data) + 9154560 (27.21% relu) + 0 (0.00% ave) + 9244672 (27.48% max), begin subset init.
+begin subset finish.
+finish creating circuit.
+commit time: 24.7325
+Verification Pass, semi final, circuit level 46
+6538179951688725281078382033124000883156139040533592669118818517984651400333 21802283322691819134437206198754489502637768743661824124142668892534295442734
+Verification fail, semi final, circuit level 45
+Verification Pass, semi final, circuit level 44
+Verification Pass, semi final, circuit level 43
+Verification Pass, semi final, circuit level 42
+39259330868977255839609382431611748889670382187275337018905367562314470625502 17959065220925270152174394641425219735641793410244367274024056396290091794428
+Verification fail, semi final, circuit level 41
+Verification Pass, semi final, circuit level 40
+40207076523516956312711820207964370889818831543677914223922491697317256283036 47976836977006163839044855898501408353454911254249392448797935923855315295210
+Verification fail, semi final, circuit level 39
+32877822797377541300857525771555846204499551989874813515369536732322760691840 26689643706869004991387390539287546201978439472577401710221733299556199846598
+Verification fail, semi final, circuit level 38
+Verification Pass, semi final, circuit level 37
+45867426587691892081552267534878755131408648322848131376639165347759798584671 17501160880322142955958613647627214391370038979262716658584734155619487590154
+Verification fail, semi final, circuit level 36
+Verification Pass, semi final, circuit level 35
+Verification Pass, semi final, circuit level 34
+Verification Pass, semi final, circuit level 33
+32410785944919691086690699088114362795413046586799218702732728636071196037547 43939162875361048295613038909807598585596858808304852711232084200082229638445
+Verification fail, semi final, circuit level 32
+Verification Pass, semi final, circuit level 31
+49755696085671883847540469696371622263478067682075421544890735570803670583525 839525205427204721710624901589442789755954444549238708316981499194547584960
+Verification fail, semi final, circuit level 30
+29073448710170960442881906313244335290435464760097658490626270656254599215490 5573633723737349378025408500753076447509724224122805547557639626439336599134
+Verification fail, semi final, circuit level 29
+Verification Pass, semi final, circuit level 28
+41853248198536648282659344606925405713830451253880190373335944643076643720353 37117142143302896407816337997295181778687351680626011457743089179248208437497
+Verification fail, semi final, circuit level 27
+Verification Pass, semi final, circuit level 26
+Verification Pass, semi final, circuit level 25
+Verification Pass, semi final, circuit level 24
+35513527673582423898799009864642370092197447193101230789249810161763086308302 18934236171786879731460225291140932465229815524350477033690222859885407824477
+Verification fail, semi final, circuit level 23
+Verification Pass, semi final, circuit level 22
+24958680743185988835634808836475438452773098379599433037067287894487782382038 20112259131094757865412654675480558908029141732122949463775204246347708065150
+Verification fail, semi final, circuit level 21
+35425072084443895127987983094248551823955665920993652800120003683939704517612 26908230370171859089395892122803039123426268998515727438914647543722026968508
+Verification fail, semi final, circuit level 20
+Verification Pass, semi final, circuit level 19
+30234326239511775653895876684506180655832940016811071861965535236418037993527 50908257924812562436329939686881534462329364648294232010756617789606542323516
+Verification fail, semi final, circuit level 18
+Verification Pass, semi final, circuit level 17
+Verification Pass, semi final, circuit level 16
+Verification Pass, semi final, circuit level 15
+Verification Pass, semi final, circuit level 14
+Verification Pass, semi final, circuit level 13
+Verification Pass, semi final, circuit level 12
+Verification Pass, semi final, circuit level 11
+Verification Pass, semi final, circuit level 10
+Verification Pass, semi final, circuit level 9
+Verification Pass, semi final, circuit level 8
+14675320151505254889303888971223663226929146076615346340364208772087415034571 12744939139764211743470296910348097893519771077681596482493553914374752639221
+Verification fail, semi final, circuit level 7
+Verification Pass, semi final, circuit level 6
+44056078189515206264691712060775462205851859093739141306403184497952674122891 12125400622916107402425490220696842339678913922492580566240728657104939497459
+Verification fail, semi final, circuit level 5
+31320685327536898284440306874301536764055729094439656232228396442319945970807 2233943076048144447449662488053587255183075134015074791600420864218363288110
+Verification fail, semi final, circuit level 4
+Verification Pass, semi final, circuit level 3
+1906775993794887977985655432425451176970411362395993067100812279278209337331 18893448634310784915519548436060959847555562457611096460668904382870015222489
+Verification fail, semi final, circuit level 2
+Verification Pass, semi final, circuit level 1
+verifyInnerLayers finished, result=0
+verifyFirstLayer finished, result=1
+verifyInput start
+Poly commit for 2^26 input.
+bulletProve time: 0.0968
+verifyInput end, result=1
+verifyInput finished, result=1
+Final Verification fail
+Prove Time (GKR only): 123.736390
+Prove Time (Poly only): 29.207064
+Prove Time (Total): 152.943454
+Proof Size (GKR only): 151.843750 kb
+Proof Size (Poly only): 386.062500 kb
+Proof Size (Total): 537.906250 kb
+Verify Time (GKR only): 0.047483
+Verify Time (Poly only): 0.047972
+Verify Time (Total): 0.095455
+vgg (relu), , , 1, , , 33647434(2^26), 123.7364, 0.0475, 151.8438, 29.2071, 0.0480, 386.0625, 152.9435, 0.0955, 537.9062, 
+date_end=Sun Aug 23 17:51:57 CST 2026
+exit=0

@@ -2,7 +2,17 @@
 // Created by 69029 on 5/4/2021.
 //
 
-#include <bits/stdc++.h>
+#include <vector>
+#include <string>
+#include <fstream>
+#include <iostream>
+#include <sstream>
+#include <algorithm>
+#include <cassert>
+#include <cmath>
+#include <cstring>
+#include <cstdio>
+#include <cstdlib>
 #include <hyrax-bls12-381/polyCommit.hpp>
 
 #ifndef ZKCNN_GLOBAL_VAR_HPP
